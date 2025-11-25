@@ -1,19 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, ChevronRight, Loader2 } from 'lucide-react';
-import { ChatMessage } from '../types';
+import { ChatMessage, DataSummary, CleaningIssues } from '../types';
 
 interface AIAssistantProps {
   isOpen: boolean;
   onToggle: () => void;
-  context?: string;
+  dataSummary?: DataSummary;
+  cleaningIssues?: CleaningIssues;
 }
 
-export default function AIAssistant({ isOpen, onToggle, context }: AIAssistantProps) {
+export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIssues }: AIAssistantProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Hi! I\'m your AI Data Analyst. I can help you understand your data, identify patterns, suggest cleaning strategies, and provide insights. What would you like to know?',
+      content: 'Hi! I\'m your AI Data Analyst. I can help you understand your data, analyze quality issues, and provide insights. Upload a dataset to get started, or ask me anything!',
       timestamp: new Date(),
     },
   ]);
@@ -25,301 +26,372 @@ export default function AIAssistant({ isOpen, onToggle, context }: AIAssistantPr
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const examplePrompts = [
-    'What cleaning strategies should I use?',
-    'How do I handle missing values?',
-    'What do outliers mean in my data?',
-    'Should I remove or impute missing data?',
-  ];
-
-  const getSmartResponse = (question: string): string => {
+  const analyzeQuestion = (question: string): string => {
     const q = question.toLowerCase();
 
+    if (!dataSummary) {
+      return `I don't have any data to analyze yet. Please upload a CSV file first, and I'll be able to help you with:
+
+• Data quality analysis
+• Missing value detection
+• Outlier identification
+• Column statistics
+• Cleaning recommendations
+• And much more!
+
+Once you upload your data, just ask me anything about it!`;
+    }
+
+    if (q.includes('how many') && (q.includes('row') || q.includes('record') || q.includes('entry') || q.includes('entries'))) {
+      return `Your dataset contains **${dataSummary.rows.toLocaleString()} rows** (records).
+
+📊 **Dataset Overview:**
+- Total Rows: ${dataSummary.rows.toLocaleString()}
+- Total Columns: ${dataSummary.columns}
+- Duplicate Rows: ${dataSummary.duplicates}
+- Unique Rows: ${(dataSummary.rows - dataSummary.duplicates).toLocaleString()}
+
+${dataSummary.duplicates > 0 ? `⚠️ Note: You have ${dataSummary.duplicates} duplicate rows that should be removed during cleaning.` : '✅ No duplicate rows detected!'}`;
+    }
+
+    if (q.includes('how many') && (q.includes('column') || q.includes('field'))) {
+      const columnList = dataSummary.columnDetails.map(col => `  • ${col.name} (${col.type})`).join('\n');
+      return `Your dataset has **${dataSummary.columns} columns**:
+
+${columnList}
+
+📋 **Column Types Breakdown:**
+- String columns: ${dataSummary.columnDetails.filter(c => c.type === 'string').length}
+- Number columns: ${dataSummary.columnDetails.filter(c => c.type === 'number').length}
+- Date columns: ${dataSummary.columnDetails.filter(c => c.type === 'date').length}
+
+Would you like to know more about any specific column?`;
+    }
+
     if (q.includes('missing') || q.includes('null') || q.includes('empty')) {
-      return `Great question about missing values! Here's my analysis:
+      const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+      const columnsWithMissing = cleaningIssues?.missingValues || [];
 
-🔍 **Understanding Missing Data:**
+      if (totalMissing === 0) {
+        return `✅ Great news! Your dataset has **no missing values**. All ${dataSummary.rows} rows are complete across all ${dataSummary.columns} columns.
 
-In your dataset, I've detected missing values in columns like Age, Score, and Date. Here's what you should do:
+This is excellent data quality!`;
+      }
 
-**1. Assess the Pattern:**
-- Random missing: Safe to impute
-- Systematic missing: Investigate why
+      const missingDetails = columnsWithMissing.map(col => {
+        const percentage = ((col.missing / dataSummary.rows) * 100).toFixed(1);
+        return `  • **${col.name}**: ${col.missing} missing (${percentage}% of rows)`;
+      }).join('\n');
 
-**2. Recommended Strategies:**
+      return `📊 **Missing Values Analysis:**
 
-**For Numeric Data (Age, Score, Revenue):**
-✓ Mean imputation - Good for normally distributed data
-✓ Median imputation - Better with outliers
-✓ KNN imputation - Most accurate but slower
+Your dataset has **${totalMissing} total missing values** across ${columnsWithMissing.length} columns:
 
-**For Categorical Data (Status, Category):**
-✓ Mode imputation - Use most frequent value
-✓ Create 'Unknown' category if missingness is meaningful
+${missingDetails}
 
-**3. My Recommendation:**
-For your data, I suggest using median for numeric columns and mode for categorical. This preserves data distribution while maintaining dataset size.
+**Recommendations:**
 
-💡 **Pro Tip:** If >30% of a column is missing, consider dropping that column instead of imputing.`;
+${columnsWithMissing.map(col => {
+  const percentage = (col.missing / dataSummary.rows) * 100;
+  if (percentage > 30) {
+    return `  ⚠️ **${col.name}**: Consider dropping this column (${percentage.toFixed(1)}% missing)`;
+  } else if (col.type === 'number') {
+    return `  ✓ **${col.name}**: Impute with median or mean`;
+  } else if (col.type === 'string') {
+    return `  ✓ **${col.name}**: Impute with mode or mark as "Unknown"`;
+  } else if (col.type === 'date') {
+    return `  ✓ **${col.name}**: Forward fill or interpolate dates`;
+  }
+  return `  ✓ **${col.name}**: Review manually`;
+}).join('\n')}
+
+Use the Auto Clean feature to handle these automatically!`;
+    }
+
+    if (q.includes('dirty') || q.includes('quality') || q.includes('clean') || q.includes('issue')) {
+      const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+      const totalInvalid = dataSummary.columnDetails.reduce((sum, col) => sum + col.invalid, 0);
+      const totalOutliers = dataSummary.columnDetails.reduce((sum, col) => sum + (col.outliers || 0), 0);
+      const totalIssues = totalMissing + totalInvalid + dataSummary.duplicates;
+
+      const qualityScore = Math.max(0, 100 - (totalIssues / dataSummary.rows * 100));
+
+      let assessment = '';
+      if (qualityScore >= 95) assessment = '✅ Excellent - Very Clean';
+      else if (qualityScore >= 85) assessment = '👍 Good - Minor Issues';
+      else if (qualityScore >= 70) assessment = '⚠️ Fair - Needs Cleaning';
+      else assessment = '🚨 Poor - Significant Issues';
+
+      return `📋 **Data Quality Report:**
+
+**Overall Quality Score: ${qualityScore.toFixed(1)}%** ${assessment}
+
+**Issues Found:**
+- Missing Values: ${totalMissing} across ${cleaningIssues?.missingValues.length || 0} columns
+- Invalid Types: ${totalInvalid} entries with type errors
+- Outliers: ${totalOutliers} potential outliers
+- Duplicates: ${dataSummary.duplicates} duplicate rows
+
+**Detailed Breakdown:**
+
+${totalMissing > 0 ? `🔴 **Missing Values:** ${cleaningIssues?.missingValues.map(c => `${c.name} (${c.missing})`).join(', ')}` : '✅ No missing values'}
+
+${totalInvalid > 0 ? `🔴 **Invalid Types:** ${cleaningIssues?.invalidTypes.map(c => `${c.name} (${c.invalid})`).join(', ')}` : '✅ All types valid'}
+
+${totalOutliers > 0 ? `🟡 **Outliers:** ${cleaningIssues?.outliers.map(c => `${c.name} (${c.outliers})`).join(', ')}` : '✅ No significant outliers'}
+
+${dataSummary.duplicates > 0 ? `🔴 **Duplicates:** ${dataSummary.duplicates} duplicate rows found` : '✅ No duplicates'}
+
+**My Recommendation:**
+${qualityScore < 85 ? 'Your data needs cleaning. Click "Auto Clean" to fix these issues automatically.' : 'Your data is in good shape! Minor cleaning will make it perfect.'}
+
+Want me to explain any specific issue in detail?`;
+    }
+
+    if (q.includes('duplicate')) {
+      if (dataSummary.duplicates === 0) {
+        return `✅ **No duplicates found!**
+
+Your dataset has ${dataSummary.rows.toLocaleString()} unique rows. This is excellent data quality - no duplicate removal needed.`;
+      }
+
+      const percentage = ((dataSummary.duplicates / dataSummary.rows) * 100).toFixed(1);
+      return `🔄 **Duplicate Rows Analysis:**
+
+Found **${dataSummary.duplicates} duplicate rows** in your dataset.
+
+**Impact:**
+- Percentage: ${percentage}% of total rows
+- Unique rows: ${dataSummary.rows - dataSummary.duplicates}
+- These should be removed to avoid:
+  • Skewed statistics
+  • Biased analysis
+  • Inflated counts
+  • Incorrect aggregations
+
+**Recommendation:**
+Remove all ${dataSummary.duplicates} duplicates using the Auto Clean feature. This will keep only the first occurrence of each duplicate row.
+
+After cleaning, you'll have ${dataSummary.rows - dataSummary.duplicates} clean, unique rows.`;
     }
 
     if (q.includes('outlier') || q.includes('extreme') || q.includes('anomal')) {
-      return `Let me explain outliers in your dataset:
+      const outlierCols = cleaningIssues?.outliers || [];
 
-📊 **Outlier Analysis:**
+      if (outlierCols.length === 0) {
+        return `✅ **No significant outliers detected** in your numeric columns.
 
-I've detected outliers in your Score and Revenue columns. Here's what they mean:
+Your data values fall within expected ranges. This indicates good data quality!`;
+      }
 
-**What are Outliers?**
-Data points significantly different from others (typically >1.5×IQR from quartiles)
+      const totalOutliers = outlierCols.reduce((sum, col) => sum + (col.outliers || 0), 0);
+      const outlierDetails = outlierCols.map(col =>
+        `  • **${col.name}**: ${col.outliers} outliers detected`
+      ).join('\n');
 
-**In Your Data:**
-- Revenue: 3 values above $10,000 (normal range: $50-$1,500)
-- Score: 2 values below 20 (normal range: 75-95)
+      return `📊 **Outlier Analysis:**
 
-**Should You Remove Them?**
+Found **${totalOutliers} outliers** in ${outlierCols.length} numeric column(s):
 
-❌ **Don't Remove If:**
-- They're legitimate high-value transactions
-- They represent important edge cases
+${outlierDetails}
+
+**What are outliers?**
+Values that are significantly different from other observations (typically >1.5×IQR from quartiles).
+
+**Should you remove them?**
+
+❌ **Keep outliers if:**
+- They represent legitimate extreme values
+- They're important edge cases
 - You're doing exploratory analysis
 
-✅ **Consider Removing If:**
+✅ **Remove outliers if:**
 - They're data entry errors
-- They'll skew statistical models
-- You're training ML models sensitive to outliers
+- They'll skew your models
+- You need normalized distributions
 
-**My Recommendation:**
-Keep outliers but flag them in a separate column. This way you can analyze with/without them and maintain data integrity.
+**My recommendation:** Review these values manually before removing. They might contain important insights!
 
-🎯 **Action:** Run robust statistical tests (median, IQR) instead of mean-based analysis to reduce outlier impact.`;
+Want to see statistics for any specific column?`;
     }
 
-    if (q.includes('clean') || q.includes('strategy') || q.includes('approach')) {
-      return `Here's your comprehensive data cleaning strategy:
+    if (q.includes('column') || q.includes('field')) {
+      const specificColumn = dataSummary.columnDetails.find(col =>
+        q.includes(col.name.toLowerCase())
+      );
 
-🛠️ **Optimal Cleaning Approach:**
+      if (specificColumn) {
+        const percentage = ((specificColumn.missing / dataSummary.rows) * 100).toFixed(1);
+        return `📊 **Column Details: ${specificColumn.name}**
 
-**Phase 1: Assessment (Current)**
-✓ Identified 47 missing values across 3 columns
-✓ Found 12 invalid type entries
-✓ Detected 8 outliers
-✓ Located 34 duplicate rows
+**Type:** ${specificColumn.type}
+**Missing Values:** ${specificColumn.missing} (${percentage}%)
+**Invalid Entries:** ${specificColumn.invalid}
+${specificColumn.outliers ? `**Outliers:** ${specificColumn.outliers}` : ''}
 
-**Phase 2: Priority Actions**
+**Quality Assessment:**
+${specificColumn.missing === 0 && specificColumn.invalid === 0 ? '✅ This column is clean and complete!' : '⚠️ This column needs attention'}
 
-**1. Remove Duplicates First** (34 rows)
-- No data loss, pure cleaning
-- Prevents analysis bias
-- Click 'Auto Clean' to handle this
+${specificColumn.missing > 0 ? `\n**Missing Values:** Consider ${specificColumn.type === 'number' ? 'median/mean imputation' : specificColumn.type === 'string' ? 'mode imputation or "Unknown"' : 'forward fill or interpolation'}` : ''}
 
-**2. Fix Invalid Types** (12 entries)
-- Dates: Convert to ISO format (YYYY-MM-DD)
-- Numbers: Replace text with median values
-- Preserves row count
+${specificColumn.invalid > 0 ? `\n**Invalid Types:** ${specificColumn.invalid} entries don't match expected ${specificColumn.type} type. These need correction.` : ''}
 
-**3. Handle Missing Values** (47 entries)
-- Numeric: Impute with median (Age, Score)
-- Categorical: Impute with mode (Status)
-- Alternative: Use KNN imputation for better accuracy
+Want to know more about this column or others?`;
+      }
 
-**4. Review Outliers** (8 entries)
-- Keep but flag for review
-- Document business reasoning
-- Consider separate analysis
+      return `I can provide detailed information about any column. Here are your columns:
 
-**Phase 3: Validation**
-- Check data types consistency
-- Verify statistical distributions
-- Confirm business logic rules
+${dataSummary.columnDetails.map(col => `  • ${col.name} (${col.type})`).join('\n')}
 
-**My Recommendation:** Start with 'Auto Clean' - it applies all best practices while preserving 97% of your data.`;
+Just ask "Tell me about [column name]" for details!`;
     }
 
-    if (q.includes('correlation') || q.includes('relationship') || q.includes('connect')) {
-      return `Let me analyze correlations in your dataset:
+    if (q.includes('invalid') || q.includes('type') || q.includes('error')) {
+      const invalidCols = cleaningIssues?.invalidTypes || [];
 
-📈 **Correlation Analysis:**
+      if (invalidCols.length === 0) {
+        return `✅ **All data types are valid!**
 
-**Strong Correlations Found:**
+Every value in your dataset matches its expected type. No type conversions needed!`;
+      }
 
-1. **Revenue ↔ Score** (r = 0.82)
-- Strong positive correlation
-- Higher scores → Higher revenue
-- This is your key metric!
+      const totalInvalid = invalidCols.reduce((sum, col) => sum + col.invalid, 0);
+      const details = invalidCols.map(col =>
+        `  • **${col.name}** (${col.type}): ${col.invalid} invalid entries`
+      ).join('\n');
 
-2. **Category ↔ Revenue** (r = 0.64)
-- Electronics: Higher avg revenue ($890)
-- Furniture: Moderate revenue ($450)
-- Consider category-based strategies
+      return `🔍 **Invalid Type Analysis:**
 
-3. **Date ↔ Score** (r = 0.31)
-- Moderate positive trend
-- Performance improving over time
+Found **${totalInvalid} invalid entries** across ${invalidCols.length} column(s):
 
-**What This Means:**
+${details}
 
-💡 **Actionable Insights:**
-- Focus on improving Score - it directly impacts Revenue
-- Electronics category drives higher value
-- Your metrics are trending positively
+**What causes invalid types?**
+- Text in numeric columns
+- Malformed dates
+- Special characters
+- Inconsistent formats
 
-🎯 **Next Steps:**
-1. Segment analysis by Category
-2. Time-series forecasting for Revenue
-3. Build predictive model using Score as primary feature
+**How to fix:**
+${invalidCols.map(col => {
+  if (col.type === 'number') return `  • **${col.name}**: Convert to numbers or replace with median`;
+  if (col.type === 'date') return `  • **${col.name}**: Convert to ISO format (YYYY-MM-DD)`;
+  return `  • **${col.name}**: Standardize format`;
+}).join('\n')}
 
-Want me to dive deeper into any specific relationship?`;
+Use Auto Clean to fix these automatically!`;
     }
 
-    if (q.includes('column') || q.includes('feature') || q.includes('important') || q.includes('matter')) {
-      return `Here's my analysis of column importance:
+    if (q.includes('statistic') || q.includes('average') || q.includes('mean') || q.includes('median')) {
+      const numericCols = dataSummary.columnDetails.filter(c => c.type === 'number');
 
-⭐ **Feature Importance Ranking:**
+      if (numericCols.length === 0) {
+        return `Your dataset has no numeric columns to calculate statistics for. The columns are:
 
-**1. Score (Most Important)** 🥇
-- Variance: High
-- Correlation with Revenue: 0.82
-- Predictive power: Excellent
-- **Action:** This is your KPI - track it closely
+${dataSummary.columnDetails.map(col => `  • ${col.name} (${col.type})`).join('\n')}`;
+      }
 
-**2. Category** 🥈
-- Distinct values: 2 (Electronics, Furniture)
-- Revenue impact: 64% correlation
-- Segmentation value: High
-- **Action:** Build category-specific strategies
+      return `📊 **Statistical Overview:**
 
-**3. Revenue** 🥉
-- Your outcome variable
-- Range: $24.99 - $1,299.99
-- Distribution: Right-skewed
-- **Action:** Use as target for predictions
+Your dataset has ${numericCols.length} numeric column(s): ${numericCols.map(c => c.name).join(', ')}
 
-**4. Date**
-- Temporal value: Medium
-- Trend analysis: Useful
-- Seasonality: Potential factor
+**Key Statistics:**
+- Data points per column: ${dataSummary.rows}
+- Valid values: Varies by column (see missing values)
+- Range: From minimum to maximum values
 
-**5. Customer Name**
-- Analysis value: Low
-- Use for: Identifying repeat customers
+**For detailed statistics:**
+Navigate to the Visualization screen to see:
+• Mean and Median values
+• Standard deviation
+• Min/Max ranges
+• Distribution charts
+• Correlation analysis
 
-**Less Critical:**
-- ID: Just an identifier
-- Status: Low variance (98% Active)
-
-**My Recommendation:**
-Build your analysis around Score and Category. These drive your business outcomes and have the clearest patterns.
-
-Want me to suggest visualization strategies for these key features?`;
+Would you like to know about a specific numeric column?`;
     }
 
-    if (q.includes('duplicate') || q.includes('same')) {
-      return `Let me explain the duplicates in your data:
+    if (q.includes('recommend') || q.includes('should') || q.includes('what do')) {
+      const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+      const totalInvalid = dataSummary.columnDetails.reduce((sum, col) => sum + col.invalid, 0);
+      const totalIssues = totalMissing + totalInvalid + dataSummary.duplicates;
 
-🔄 **Duplicate Analysis:**
+      if (totalIssues === 0) {
+        return `✅ **Your data is already clean!**
 
-**Found: 34 duplicate rows**
+No issues detected:
+- No missing values
+- No invalid types
+- No duplicates
 
-**What Causes Duplicates?**
-- Double data entry
-- System sync errors
-- Multiple form submissions
-- ETL pipeline issues
+You can proceed directly to visualization and analysis. Great job maintaining clean data!`;
+      }
 
-**Impact on Your Analysis:**
-- Skews statistical measures
-- Inflates correlation coefficients
-- Biases model training
-- Distorts aggregated metrics
+      return `🎯 **My Cleaning Recommendations:**
 
-**My Recommendation:**
+**Step 1: Remove Duplicates** (Priority: High)
+${dataSummary.duplicates > 0 ? `Remove ${dataSummary.duplicates} duplicate rows - no information loss!` : '✅ No duplicates to remove'}
 
-✅ **Remove All Duplicates**
-They provide no additional information and can harm analysis accuracy.
+**Step 2: Fix Invalid Types** (Priority: High)
+${totalInvalid > 0 ? `Fix ${totalInvalid} type errors to ensure data consistency` : '✅ All types are valid'}
 
-**How We Identify Them:**
-Rows are considered duplicates when ALL columns match exactly (except ID).
+**Step 3: Handle Missing Values** (Priority: Medium)
+${totalMissing > 0 ? `Impute or remove ${totalMissing} missing values` : '✅ No missing values'}
 
-**Your Options:**
-1. **Auto Clean** - Removes all duplicates automatically
-2. Keep first occurrence, remove rest
-3. Review manually before removal
+**Quick Action:**
+Click the **"Auto Clean"** button to automatically:
+1. Remove all duplicates
+2. Fix type inconsistencies
+3. Impute missing values intelligently
+4. Flag outliers for review
 
-⚠️ **Important:** After removal, your dataset will have 1,213 rows (was 1,247). All duplicate information is preserved in the kept rows.
+This will clean ${totalIssues} issues in seconds!
 
-Want to proceed with duplicate removal?`;
+After cleaning, your data will be ready for analysis and visualization.`;
     }
 
-    if (q.includes('download') || q.includes('export') || q.includes('save')) {
-      return `Here's how to download your cleaned data:
+    if (q.includes('help') || q.includes('what can') || q.includes('how do')) {
+      return `🤖 **I'm your AI Data Analyst! Here's what I can do:**
 
-💾 **Export Options:**
+**📊 Data Analysis:**
+- "How many rows/columns do I have?"
+- "Tell me about the [column name] column"
+- "Show me statistics"
 
-**1. Download Cleaned Data** (Recommended)
-- Click the green 'Download Cleaned Data' button
-- Format: CSV file
-- Includes: All ${context === 'cleaning' ? '1,213' : '1,247'} rows with fixes applied
-- Timestamp: Auto-added to filename
+**🔍 Quality Assessment:**
+- "Is my data dirty?"
+- "What issues does my data have?"
+- "Check data quality"
 
-**What's Included:**
-✓ All original rows (minus 34 duplicates)
-✓ Missing values imputed
-✓ Invalid types corrected
-✓ Outliers flagged but retained
-✓ Metadata comments explaining changes
+**🧹 Cleaning Guidance:**
+- "How should I clean my data?"
+- "What about missing values?"
+- "Should I remove duplicates?"
+- "Tell me about outliers"
 
-**File Structure:**
-- Header row with column names
-- Clean, standardized data
-- ISO date formats (YYYY-MM-DD)
-- Numeric types validated
-- Ready for Excel, Python, R, or Tableau
+**💡 Insights:**
+- "Which columns need attention?"
+- "What's the quality score?"
+- "What do you recommend?"
 
-**Best Practices:**
-- Keep original file as backup
-- Document what cleaning was applied
-- Use version numbers (v1, v2, etc.)
+Just ask me anything about your data in natural language, and I'll provide detailed, actionable insights!
 
-📊 **Next Steps After Download:**
-1. Import to your analysis tool
-2. Verify data looks correct
-3. Run your analysis with confidence!
-
-Ready to download? Click the button in the Cleaning Actions section!`;
+${!dataSummary ? '\n📤 Upload a dataset to get started!' : ''}`;
     }
 
-    return `I understand you're asking about "${question}".
+    return `I understand you're asking: "${question}"
 
-${context ? `📍 **Current Context:** ${context}\n\n` : ''}I'm here to help with:
+${dataSummary ? `I have analyzed your dataset with ${dataSummary.rows} rows and ${dataSummary.columns} columns.` : 'Please upload a dataset first so I can analyze it.'}
 
-🔍 **Data Quality:**
-- Missing value strategies
-- Outlier detection & handling
-- Duplicate identification
-- Data type validation
+Here are some things you can ask me:
+- "How many rows do I have?"
+- "Is my data dirty?"
+- "Tell me about missing values"
+- "What columns need cleaning?"
+- "Show me data quality"
+- "What do you recommend?"
 
-📊 **Analysis Guidance:**
-- Statistical insights
-- Correlation analysis
-- Feature importance
-- Trend identification
-
-🛠️ **Cleaning Recommendations:**
-- Best practices for your data
-- Custom strategies
-- Tool suggestions
-
-💡 **Pro Tips:**
-- Visualization ideas
-- Next steps
-- Common pitfalls to avoid
-
-Could you be more specific? Try asking about:
-- "How should I handle missing values?"
-- "What do these outliers mean?"
-- "Which columns are most important?"
-- "Should I remove duplicates?"`;
+Try asking something more specific, and I'll give you detailed insights!`;
   };
 
   const handleSend = () => {
@@ -338,7 +410,7 @@ Could you be more specific? Try asking about:
     setInput('');
 
     setTimeout(() => {
-      const response = getSmartResponse(currentInput);
+      const response = analyzeQuestion(currentInput);
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -347,8 +419,20 @@ Could you be more specific? Try asking about:
       };
       setMessages((prev) => [...prev, assistantMessage]);
       setIsTyping(false);
-    }, 1200 + Math.random() * 800);
+    }, 800 + Math.random() * 400);
   };
+
+  const examplePrompts = dataSummary ? [
+    'How many rows do I have?',
+    'Is my data dirty?',
+    'Tell me about missing values',
+    'What do you recommend?',
+  ] : [
+    'What can you help me with?',
+    'How do I get started?',
+    'What features do you have?',
+    'Tell me about data cleaning',
+  ];
 
   return (
     <>
@@ -371,7 +455,7 @@ Could you be more specific? Try asking about:
             </div>
             <div>
               <h3 className="font-semibold">AI Data Analyst</h3>
-              <p className="text-xs text-blue-100">Powered by advanced ML</p>
+              <p className="text-xs text-blue-100">Ask me anything about your data</p>
             </div>
           </div>
           <button
@@ -428,7 +512,7 @@ Could you be more specific? Try asking about:
               <div className="flex-1 rounded-2xl p-3 bg-gray-100 text-gray-900">
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                  <p className="text-sm text-gray-600">AI is analyzing your question...</p>
+                  <p className="text-sm text-gray-600">Analyzing your data...</p>
                 </div>
               </div>
             </div>
