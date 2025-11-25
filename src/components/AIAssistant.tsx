@@ -42,6 +42,118 @@ export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIss
 Once you upload your data, just ask me anything about it!`;
     }
 
+    if (q.includes('explain') && (q.includes('csv') || q.includes('file') || q.includes('data'))) {
+      const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+      const totalInvalid = dataSummary.columnDetails.reduce((sum, col) => sum + col.invalid, 0);
+      const totalOutliers = dataSummary.columnDetails.reduce((sum, col) => sum + (col.outliers || 0), 0);
+
+      return `📊 **Complete Dataset Explanation:**
+
+**Dataset Size:**
+- Total Rows: ${dataSummary.rows.toLocaleString()}
+- Total Columns: ${dataSummary.columns}
+
+**Columns in Your Dataset:**
+${dataSummary.columnDetails.map(col => `  • **${col.name}** (${col.type})${col.missing > 0 ? ` - ${col.missing} missing` : ''}${col.invalid > 0 ? ` - ${col.invalid} invalid` : ''}${col.outliers ? ` - ${col.outliers} outliers` : ''}`).join('\n')}
+
+**Data Quality Summary:**
+- Missing Values: ${totalMissing} total
+- Invalid Type Entries: ${totalInvalid}
+- Outliers Detected: ${totalOutliers}
+- Duplicate Rows: ${dataSummary.duplicates}
+
+**What This Data Contains:**
+This CSV file contains ${dataSummary.rows} records with ${dataSummary.columns} different attributes. ${totalMissing + totalInvalid + dataSummary.duplicates > 0 ? 'There are some data quality issues that need attention.' : 'The data quality is good with minimal issues.'}
+
+Want to know more about specific columns or issues?`;
+    }
+
+    if (q.includes('list') || q.includes('show') || q.includes('give')) {
+      if (q.includes('missing')) {
+        const columnsWithMissing = cleaningIssues?.missingValues || [];
+        if (columnsWithMissing.length === 0) {
+          return `✅ **No Missing Values!**
+
+Your dataset is complete - no missing values in any column!`;
+        }
+
+        const missingList = columnsWithMissing.map(col => {
+          const percentage = ((col.missing / dataSummary.rows) * 100).toFixed(1);
+          return `  ${col.missing}. **${col.name}** (${col.type})\n     - ${col.missing} values missing (${percentage}% of ${dataSummary.rows} rows)`;
+        }).join('\n\n');
+
+        return `📋 **Complete List of Missing Values:**
+
+${missingList}
+
+**Total Missing:** ${columnsWithMissing.reduce((sum, col) => sum + col.missing, 0)} values across ${columnsWithMissing.length} columns
+
+Would you like recommendations on how to handle these?`;
+      }
+
+      if (q.includes('column') || q.includes('field')) {
+        const columnList = dataSummary.columnDetails.map((col, idx) =>
+          `  ${idx + 1}. **${col.name}**\n     - Type: ${col.type}\n     - Missing: ${col.missing}\n     - Invalid: ${col.invalid}${col.outliers ? `\n     - Outliers: ${col.outliers}` : ''}`
+        ).join('\n\n');
+
+        return `📋 **Complete Column List:**
+
+${columnList}
+
+**Summary:**
+- Total Columns: ${dataSummary.columns}
+- String Columns: ${dataSummary.columnDetails.filter(c => c.type === 'string').length}
+- Numeric Columns: ${dataSummary.columnDetails.filter(c => c.type === 'number').length}
+- Date Columns: ${dataSummary.columnDetails.filter(c => c.type === 'date').length}
+
+Ask about any specific column for detailed analysis!`;
+      }
+
+      if (q.includes('issue') || q.includes('problem') || q.includes('error')) {
+        const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+        const totalInvalid = dataSummary.columnDetails.reduce((sum, col) => sum + col.invalid, 0);
+        const totalOutliers = dataSummary.columnDetails.reduce((sum, col) => sum + (col.outliers || 0), 0);
+
+        let issuesList = [];
+
+        if (totalMissing > 0) {
+          issuesList.push(`**Missing Values:** ${totalMissing} total\n${(cleaningIssues?.missingValues || []).map(c => `     - ${c.name}: ${c.missing} missing`).join('\n')}`);
+        }
+
+        if (totalInvalid > 0) {
+          issuesList.push(`**Invalid Types:** ${totalInvalid} total\n${(cleaningIssues?.invalidTypes || []).map(c => `     - ${c.name}: ${c.invalid} invalid`).join('\n')}`);
+        }
+
+        if (totalOutliers > 0) {
+          issuesList.push(`**Outliers:** ${totalOutliers} total\n${(cleaningIssues?.outliers || []).map(c => `     - ${c.name}: ${c.outliers} outliers`).join('\n')}`);
+        }
+
+        if (dataSummary.duplicates > 0) {
+          issuesList.push(`**Duplicates:** ${dataSummary.duplicates} duplicate rows`);
+        }
+
+        if (issuesList.length === 0) {
+          return `✅ **No Issues Found!**
+
+Your data is clean and ready for analysis:
+- No missing values
+- No invalid types
+- No duplicates
+- No significant outliers
+
+Great job maintaining clean data!`;
+        }
+
+        return `🔍 **Complete Issue List:**
+
+${issuesList.join('\n\n')}
+
+**Total Issues:** ${totalMissing + totalInvalid + dataSummary.duplicates}
+
+Click "Auto Clean" to fix all issues automatically!`;
+      }
+    }
+
     if (q.includes('how many') && (q.includes('row') || q.includes('record') || q.includes('entry') || q.includes('entries'))) {
       return `Your dataset contains **${dataSummary.rows.toLocaleString()} rows** (records).
 
@@ -379,19 +491,38 @@ Just ask me anything about your data in natural language, and I'll provide detai
 ${!dataSummary ? '\n📤 Upload a dataset to get started!' : ''}`;
     }
 
-    return `I understand you're asking: "${question}"
+    const totalMissing = dataSummary.columnDetails.reduce((sum, col) => sum + col.missing, 0);
+    const totalInvalid = dataSummary.columnDetails.reduce((sum, col) => sum + col.invalid, 0);
+    const qualityScore = Math.max(0, 100 - ((totalMissing + totalInvalid + dataSummary.duplicates) / dataSummary.rows * 100));
 
-${dataSummary ? `I have analyzed your dataset with ${dataSummary.rows} rows and ${dataSummary.columns} columns.` : 'Please upload a dataset first so I can analyze it.'}
+    return `I'm analyzing your question: "${question}"
 
-Here are some things you can ask me:
-- "How many rows do I have?"
+📊 **Quick Data Overview:**
+- Total Rows: ${dataSummary.rows.toLocaleString()}
+- Total Columns: ${dataSummary.columns}
+- Quality Score: ${qualityScore.toFixed(1)}%
+${totalMissing > 0 ? `- Missing Values: ${totalMissing}` : ''}
+${dataSummary.duplicates > 0 ? `- Duplicates: ${dataSummary.duplicates}` : ''}
+
+**I can help you with:**
+
+📋 **Lists & Details:**
+- "Show me the list of columns"
+- "Give me the list of missing values"
+- "List all issues"
+
+🔍 **Analysis:**
+- "Explain this CSV file"
 - "Is my data dirty?"
-- "Tell me about missing values"
-- "What columns need cleaning?"
-- "Show me data quality"
+- "What's the quality of my data?"
+- "Tell me about [column name]"
+
+💡 **Recommendations:**
+- "What should I do?"
+- "How do I clean this?"
 - "What do you recommend?"
 
-Try asking something more specific, and I'll give you detailed insights!`;
+Try asking something like these examples, and I'll provide detailed insights!`;
   };
 
   const handleSend = () => {
@@ -423,10 +554,10 @@ Try asking something more specific, and I'll give you detailed insights!`;
   };
 
   const examplePrompts = dataSummary ? [
-    'How many rows do I have?',
+    'Explain this CSV file',
+    'Show me the list of missing values',
     'Is my data dirty?',
-    'Tell me about missing values',
-    'What do you recommend?',
+    'List all columns',
   ] : [
     'What can you help me with?',
     'How do I get started?',
