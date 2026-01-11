@@ -304,8 +304,9 @@ export default function CleaningScreen({
       <AIAssistant
         isOpen={isAssistantOpen}
         onToggle={() => setIsAssistantOpen(!isAssistantOpen)}
-        dataSummary={dataSummary}
-        cleaningIssues={cleanedIssues}
+        context="data cleaning report"
+        rows={undefined}
+
       />
     </div>
   );

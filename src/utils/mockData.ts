@@ -36,3 +36,15 @@ export function generateStatistics(): Statistics {
     stdDev: 22.67,
   };
 }
+// Add this to src/utils/mockData.ts
+export function generateMockRows() {
+  return [
+    { "Customer Name": "Mike Smith", Product: "Laptop", Category: "Electronics", Date: "2025-01-05", Revenue: 1200, Quantity: 1, Status: "Paid", Region: "Sydney" },
+    { "Customer Name": "John Doe", Product: "Mouse", Category: "Electronics", Date: "2025-01-06", Revenue: 25, Quantity: 2, Status: "Paid", Region: "Melbourne" },
+    { "Customer Name": "Mike Brown", Product: "Chair", Category: "Furniture", Date: "2025-01-06", Revenue: 180, Quantity: 1, Status: "Pending", Region: "Sydney" },
+    { "Customer Name": "Sara Lee", Product: "Desk", Category: "Furniture", Date: "2025-01-07", Revenue: 350, Quantity: 1, Status: "Paid", Region: "Brisbane" },
+    { "Customer Name": "Mike Smith", Product: "Laptop", Category: "Electronics", Date: "2025-01-05", Revenue: 1200, Quantity: 1, Status: "Paid", Region: "Sydney" }, // duplicate on purpose
+    { "Customer Name": "", Product: "Keyboard", Category: "Electronics", Date: "2025-01-08", Revenue: 80, Quantity: 1, Status: "Paid", Region: "Perth" }, // missing name
+    { "Customer Name": "Emily Stone", Product: "Headphones", Category: "Electronics", Date: "2025-01-08", Revenue: null, Quantity: 1, Status: "Paid", Region: "Sydney" }, // missing revenue
+  ];
+}

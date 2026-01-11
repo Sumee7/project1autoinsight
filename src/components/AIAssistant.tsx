@@ -2,12 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, ChevronRight, Loader2 } from 'lucide-react';
 import { ChatMessage, DataSummary, CleaningIssues } from '../types';
 
+type DataRow = Record<string, string | number>;
+
 interface AIAssistantProps {
   isOpen: boolean;
   onToggle: () => void;
   dataSummary?: DataSummary;
   cleaningIssues?: CleaningIssues;
+  context?: string;
+  rows?: DataRow[]; // 👈 new line
 }
+
 
 export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIssues }: AIAssistantProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -25,7 +30,27 @@ export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIss
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
+  
+  function answerNameCount(question: string, rows?: DataRow[]) {
+    if (!rows) return null;
+  
+    const match = question.toLowerCase().match(/how many (\w+)/);
+    if (!match) return null;
+  
+    const name = match[1]; // the name user asked for
+    let count = 0;
+  
+    for (const row of rows) {
+      for (const value of Object.values(row)) {
+        if (String(value).toLowerCase() === name.toLowerCase()) {
+          count++;
+        }
+      }
+    }
+  
+    return `There are **${count}** records containing the name "${name}".`;
+  }
+  
   const analyzeQuestion = (question: string): string => {
     const q = question.toLowerCase();
 
