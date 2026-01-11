@@ -35,5 +35,5 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export type Screen = 'upload' | 'cleaning' | 'visualization' | 'summary';
+export type Screen = 'login' | 'upload' | 'cleaning' | 'visualization' | 'summary';
 export type ChartType = 'line' | 'bar' | 'scatter';

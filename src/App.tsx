@@ -5,9 +5,10 @@ import CleaningScreen from './components/CleaningScreen';
 import VisualizationScreen from './components/VisualizationScreen';
 import SummaryScreen from './components/SummaryScreen';
 import { generateMockDataSummary, generateCleaningIssues, generateStatistics } from './utils/mockData';
+import LoginScreen from './components/LoginScreen';
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const dataSummary = generateMockDataSummary();
@@ -74,6 +75,9 @@ function App() {
           onStartNew={handleStartNew}
         />
       )}
+     {currentScreen === 'login' && (
+  <LoginScreen onSuccess={() => setCurrentScreen('upload')} />
+)} 
     </>
   );
 }
