@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, ChevronRight, Loader2 } from 'lucide-react';
 import { ChatMessage, DataSummary, CleaningIssues } from '../types';
+import { answerSalesQuestion } from "../utils/salesAI";
 
 type DataRow = Record<string, string | number>;
 
@@ -14,7 +15,8 @@ interface AIAssistantProps {
 }
 
 
-export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIssues }: AIAssistantProps) {
+export default function AIAssistant({ isOpen, onToggle, dataSummary, cleaningIssues, rows }: AIAssistantProps) {
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -566,7 +568,24 @@ Try asking something like these examples, and I'll provide detailed insights!`;
     setInput('');
 
     setTimeout(() => {
-      const response = analyzeQuestion(currentInput);
+      const headers = rows && rows.length > 0 ? Object.keys(rows[0]) : [];
+
+let response: string;
+
+// If we have raw rows, use the advanced engine
+if (rows && rows.length > 0 && headers.length > 0) {
+  const ans = answerSalesQuestion({ question: currentInput, rows, headers });
+
+  // Keep it readable: main answer + small "How I got this"
+  response =
+    `${ans.text}\n\n` +
+    `How I got this:\n` +
+    ans.how.map(h => `• ${h}`).join("\n");
+} else {
+  // fallback to your existing logic
+  response = analyzeQuestion(currentInput);
+}
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
