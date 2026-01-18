@@ -1,35 +1,32 @@
-import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle, Database, Sparkles, Download } from 'lucide-react';
-import { DataSummary, CleaningIssues } from '../types';
-import AIAssistant from './AIAssistant';
-import type { DataRow } from '../utils/salesAI'; // ✅ FIX 1: import as type
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle, Database, Sparkles, Download } from "lucide-react";
+import type { DataSummary, CleaningIssues } from "../types";
+import AIAssistant from "./AIAssistant";
 
 interface CleaningScreenProps {
   dataSummary: DataSummary;
   cleaningIssues: CleaningIssues;
-  rows: DataRow[]; // ✅ rows added
-  onClean: (type: 'auto' | 'missing' | 'invalid') => void;
+  onClean: (type: "auto" | "missing" | "invalid") => void;
   onNext: () => void;
 }
 
 export default function CleaningScreen({
   dataSummary,
   cleaningIssues,
-  rows,
   onClean,
   onNext,
 }: CleaningScreenProps) {
   const [cleaned, setCleaned] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
-  // Local UI state (keeps the screen responsive even if parent updates async)
+  // Local UI state (lets the screen update instantly)
   const [cleanedIssues, setCleanedIssues] = useState<CleaningIssues>(cleaningIssues);
   const [cleanedRows, setCleanedRows] = useState<number>(dataSummary.rows);
 
-  // Prevent multiple stacked timeouts
+  // prevent stacking multiple timeouts
   const bannerTimeoutRef = useRef<number | null>(null);
 
-  // Keep local UI in sync if parent passes new props (e.g., after real cleaning finishes)
+  // keep UI synced if parent sends updated props later
   useEffect(() => {
     setCleanedIssues(cleaningIssues);
   }, [cleaningIssues]);
@@ -52,77 +49,62 @@ export default function CleaningScreen({
     bannerTimeoutRef.current = window.setTimeout(() => setCleaned(false), 5000);
   };
 
-  const handleClean = (type: 'auto' | 'missing' | 'invalid') => {
-    // Trigger parent-side cleaning logic (if any)
+  const handleClean = (type: "auto" | "missing" | "invalid") => {
     onClean(type);
 
-    // Update UI immediately
-    if (type === 'auto') {
+    if (type === "auto") {
       setCleanedIssues({
         missingValues: [],
         invalidTypes: [],
         outliers: [],
         duplicates: 0,
       });
-      // assume duplicates removed; adjust visible rows
       setCleanedRows(dataSummary.rows - dataSummary.duplicates);
-    } else if (type === 'missing') {
-<<<<<<< HEAD
-      setCleanedIssues({
-        ...cleaningIssues,
-=======
+    } else if (type === "missing") {
       setCleanedIssues((prev) => ({
         ...prev,
->>>>>>> 415c57e (Fix CleaningScreen state handling and UI sync)
         missingValues: [],
       }));
-      // rows typically unchanged for imputations
-    } else if (type === 'invalid') {
-<<<<<<< HEAD
-      setCleanedIssues({
-        ...cleaningIssues,
-=======
+    } else if (type === "invalid") {
       setCleanedIssues((prev) => ({
         ...prev,
->>>>>>> 415c57e (Fix CleaningScreen state handling and UI sync)
         invalidTypes: [],
       }));
-      // rows typically unchanged unless you drop invalid rows (your call)
     }
 
     showSuccessBanner();
   };
 
   const handleDownloadCleaned = () => {
-    // NOTE: Demo CSV. If you want real cleaned data, pass it in via props/state and serialize it here.
-    const csvHeader = 'ID,Date,Customer Name,Product,Category,Score,Revenue,Status\n';
+    // Demo CSV (replace with real cleaned data if you have it in state)
+    const csvHeader = "ID,Date,Customer Name,Product,Category,Score,Revenue,Status\n";
     const csvRows = [
-      '1,2024-01-15,John Doe,Laptop,Electronics,95.2,1299.99,Active',
-      '2,2024-01-16,Jane Smith,Desk Chair,Furniture,87.5,249.99,Active',
-      '3,2024-01-17,Michael Brown,Monitor,Electronics,92.1,459.99,Active',
-      '4,2024-01-18,Sarah Wilson,Standing Desk,Furniture,88.7,799.99,Active',
-      '5,2024-01-19,David Lee,Keyboard,Electronics,91.3,129.99,Active',
-      '6,2024-01-20,Emily Chen,Office Chair,Furniture,89.8,349.99,Active',
-      '7,2024-01-21,James Taylor,Mouse Pad,Electronics,85.2,24.99,Active',
-      '8,2024-01-22,Lisa Anderson,Bookshelf,Furniture,90.5,199.99,Active',
-      '9,2024-01-23,Robert Garcia,Webcam,Electronics,93.4,89.99,Active',
-      '10,2024-01-24,Maria Martinez,Lamp,Furniture,86.9,59.99,Active',
-      `# Total: ${cleanedRows.toLocaleString()} rows`,
+      "1,2024-01-15,John Doe,Laptop,Electronics,95.2,1299.99,Active",
+      "2,2024-01-16,Jane Smith,Desk Chair,Furniture,87.5,249.99,Active",
+      "3,2024-01-17,Michael Brown,Monitor,Electronics,92.1,459.99,Active",
+      "4,2024-01-18,Sarah Wilson,Standing Desk,Furniture,88.7,799.99,Active",
+      "5,2024-01-19,David Lee,Keyboard,Electronics,91.3,129.99,Active",
+      "6,2024-01-20,Emily Chen,Office Chair,Furniture,89.8,349.99,Active",
+      "7,2024-01-21,James Taylor,Mouse Pad,Electronics,85.2,24.99,Active",
+      "8,2024-01-22,Lisa Anderson,Bookshelf,Furniture,90.5,199.99,Active",
+      "9,2024-01-23,Robert Garcia,Webcam,Electronics,93.4,89.99,Active",
+      "10,2024-01-24,Maria Martinez,Lamp,Furniture,86.9,59.99,Active",
+      `# Total: ${cleanedRows} rows`,
       `# Duplicates removed: ${dataSummary.duplicates}`,
-      '# Missing values imputed: Mean for numeric, Mode for categorical',
-      '# Invalid dates corrected to ISO format (YYYY-MM-DD)',
-      '# Invalid numbers replaced with column median',
-      '# Outliers retained (can be filtered if needed)',
-      '# All data types validated and standardized',
+      "# Missing values imputed: Mean for numeric, Mode for categorical",
+      "# Invalid dates corrected to ISO format (YYYY-MM-DD)",
+      "# Invalid numbers replaced with column median",
+      "# Outliers retained (can be filtered if needed)",
+      "# All data types validated and standardized",
     ];
 
-    const csvContent = csvHeader + csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = csvHeader + csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `cleaned-data-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `cleaned-data-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
 
     URL.revokeObjectURL(url);
@@ -179,10 +161,6 @@ export default function CleaningScreen({
             </div>
           </div>
 
-<<<<<<< HEAD
-          {/* everything else unchanged… */}
-          {/* (your issues + actions + next button are fine as-is) */}
-=======
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-center gap-3 mb-6">
               <AlertCircle className="w-6 h-6 text-orange-600" />
@@ -313,7 +291,7 @@ export default function CleaningScreen({
 
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => handleClean('auto')}
+                onClick={() => handleClean("auto")}
                 className="flex items-center gap-2 bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
               >
                 <Sparkles className="w-5 h-5" />
@@ -321,14 +299,14 @@ export default function CleaningScreen({
               </button>
 
               <button
-                onClick={() => handleClean('missing')}
+                onClick={() => handleClean("missing")}
                 className="bg-white text-gray-700 font-medium px-6 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Fix Missing Only
               </button>
 
               <button
-                onClick={() => handleClean('invalid')}
+                onClick={() => handleClean("invalid")}
                 className="bg-white text-gray-700 font-medium px-6 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Fix Invalid Rows
@@ -351,7 +329,6 @@ export default function CleaningScreen({
               </p>
             </div>
           </div>
->>>>>>> 415c57e (Fix CleaningScreen state handling and UI sync)
 
           <div className="flex justify-end">
             <button
@@ -368,13 +345,7 @@ export default function CleaningScreen({
         isOpen={isAssistantOpen}
         onToggle={() => setIsAssistantOpen(!isAssistantOpen)}
         dataSummary={dataSummary}
-<<<<<<< HEAD
-        cleaningIssues={cleaningIssues}
-        context="data cleaning report"
-        rows={rows}
-=======
         cleaningIssues={cleanedIssues}
->>>>>>> 415c57e (Fix CleaningScreen state handling and UI sync)
       />
     </div>
   );

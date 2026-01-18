@@ -1,101 +1,131 @@
-import { useState } from 'react';
-import { Screen } from './types';
-import UploadScreen from './components/UploadScreen';
-import CleaningScreen from './components/CleaningScreen';
-import VisualizationScreen from './components/VisualizationScreen';
-import SummaryScreen from './components/SummaryScreen';
-<<<<<<< Updated upstream
-import { generateMockDataSummary, generateCleaningIssues, generateStatistics } from './utils/mockData';
-import LoginScreen from './components/LoginScreen';
-=======
-import { generateMockDataSummary, generateCleaningIssues, generateStatistics, generateMockRows } from './utils/mockData';
+import { useState } from "react";
 
-type DataRow = Record<string, string | number | null>;
->>>>>>> Stashed changes
+import LoginScreen from "./components/LoginScreen";
+import UploadScreen from "./components/UploadScreen";
+import CleaningScreen from "./components/CleaningScreen";
+import VisualizationScreen from "./components/VisualizationScreen";
 
-function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+import { analyzeCsvFile } from "./utils/csvAnalysis";
+import type { CleaningIssues, DataSummary, Statistics } from "./types";
+
+type Step = "login" | "upload" | "cleaning" | "visualization";
+
+const emptyStats: Statistics = {
+  mean: 0,
+  median: 0,
+  min: 0,
+  max: 0,
+  stdDev: 0,
+};
+
+export default function App() {
+  const [step, setStep] = useState<Step>("login");
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // ✅ Real rows state (what the AI needs)
-  const [rows, setRows] = useState<DataRow[]>([]);
+  const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
+  const [cleaningIssues, setCleaningIssues] = useState<CleaningIssues | null>(null);
 
-  // still using mocks for summary/stats for now (until real CSV parsing)
-  const dataSummary = generateMockDataSummary();
-  const cleaningIssues = generateCleaningIssues(dataSummary);
-  const statistics = generateStatistics();
+  // VisualizationScreen bunu istiyor: Statistics
+  const [statistics, setStatistics] = useState<Statistics>(emptyStats);
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
+  const handleAnalyze = async () => {
+    if (!selectedFile) return;
+
+    try {
+      const result = await analyzeCsvFile(selectedFile);
+
+      setDataSummary(result.dataSummary);
+      setCleaningIssues(result.cleaningIssues);
+
+      // csvAnalysis statistics döndürmüyorsa bile crash olmasın diye default set
+      setStatistics((result as any).statistics ?? emptyStats);
+
+      setStep("cleaning");
+    } catch (err) {
+      console.error(err);
+      alert("CSV analysis failed. Please check the CSV format and try again.");
+    }
   };
 
-  const handleAnalyze = () => {
-    // ✅ Load mock rows now. Later this becomes real parsed CSV rows.
-    setRows(generateMockRows());
-    setCurrentScreen('cleaning');
+  const handleClean = (type: "auto" | "missing" | "invalid") => {
+    // Şimdilik UI simülasyonu: İstersen gerçek temizleme de ekleriz.
+    console.log("Clean:", type);
+
+    if (!dataSummary || !cleaningIssues) return;
+
+    if (type === "auto") {
+      setCleaningIssues({
+        missingValues: [],
+        invalidTypes: [],
+        outliers: [],
+        duplicates: 0,
+      });
+
+      setDataSummary({
+        ...dataSummary,
+        rows: Math.max(0, dataSummary.rows - (dataSummary.duplicates ?? 0)),
+        duplicates: 0,
+      });
+    }
+
+    if (type === "missing") {
+      setCleaningIssues({
+        ...cleaningIssues,
+        missingValues: [],
+      });
+    }
+
+    if (type === "invalid") {
+      setCleaningIssues({
+        ...cleaningIssues,
+        invalidTypes: [],
+      });
+    }
   };
 
-  const handleClean = (type: 'auto' | 'missing' | 'invalid') => {
-    console.log('Cleaning data with type:', type);
-  };
+  // ---------------- RENDER ----------------
 
-  const handleExport = () => {
-    console.log('Exporting cleaned data');
-    const blob = new Blob(['Cleaned CSV data would be here'], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'cleaned-data.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  if (step === "login") {
+    // ✅ LoginScreen prop ismi onSuccess
+    return <LoginScreen onSuccess={() => setStep("upload")} />;
+  }
 
-  const handleStartNew = () => {
-    setSelectedFile(null);
-    setRows([]);
-    setCurrentScreen('upload');
-  };
+  if (step === "upload") {
+    return (
+      <UploadScreen
+        selectedFile={selectedFile}
+        onFileSelect={(file) => setSelectedFile(file)}
+        onAnalyze={handleAnalyze}
+      />
+    );
+  }
 
+  if (step === "cleaning") {
+    if (!dataSummary || !cleaningIssues) {
+      // güvenlik
+      setStep("upload");
+      return null;
+    }
+
+    return (
+      <CleaningScreen
+        dataSummary={dataSummary}
+        cleaningIssues={cleaningIssues}
+        onClean={handleClean}
+        onNext={() => setStep("visualization")}
+      />
+    );
+  }
+
+  // visualization
   return (
-    <>
-      {currentScreen === 'upload' && (
-        <UploadScreen
-          onFileSelect={handleFileSelect}
-          selectedFile={selectedFile}
-          onAnalyze={handleAnalyze}
-        />
-      )}
-
-      {currentScreen === 'cleaning' && (
-        <CleaningScreen
-          dataSummary={dataSummary}
-          cleaningIssues={cleaningIssues}
-          onClean={handleClean}
-          onNext={() => setCurrentScreen('visualization')}
-        />
-      )}
-
-      {currentScreen === 'visualization' && (
-        <VisualizationScreen
-          statistics={statistics}
-          onNext={() => setCurrentScreen('summary')}
-        />
-      )}
-
-      {currentScreen === 'summary' && (
-        <SummaryScreen
-          rowsCleaned={78}
-          columnsAffected={6}
-          insightsGenerated={12}
-          onExport={handleExport}
-          onStartNew={handleStartNew}
-        />
-      )}
-     {currentScreen === 'login' && (
-  <LoginScreen onSuccess={() => setCurrentScreen('upload')} />
-)} 
-    </>
+    <VisualizationScreen
+      statistics={statistics}
+      onNext={() => {
+        // Summary sayfan varsa buraya bağlarız
+        alert("Summary screen is not connected yet. If you want, I can link it now.");
+      }}
+    />
   );
 }
-
-export default App;
