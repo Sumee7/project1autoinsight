@@ -4,17 +4,11 @@ import {
   Line,
   BarChart,
   Bar,
-  ScatterChart,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 import {
   TrendingUp,
@@ -27,9 +21,7 @@ import type { DataRow, DataSummary } from '../types';
 import {
   generateDistribution,
   generateCategoryChart,
-  generateCorrelationMatrix,
   isDateColumn,
-  generateBoxPlot,
   generateColumnStatistics,
   generateTimeSeries,
 } from '../utils/dataVisualization';
@@ -41,11 +33,8 @@ interface AnalyticsDashboardProps {
   onExport?: () => void;
 }
 
-const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-
 export default function AnalyticsDashboard({
   data,
-  dataSummary,
   onExport,
 }: AnalyticsDashboardProps) {
   const [selectedColumn, setSelectedColumn] = useState<string>(
@@ -72,21 +61,6 @@ export default function AnalyticsDashboard({
   const categoryData = !isNumeric ? generateCategoryChart(data, selectedColumn) : [];
   const stats = isNumeric ? generateColumnStatistics(data, selectedColumn) : null;
   const anomalies = isNumeric ? detectAnomaliesZScore(data, selectedColumn) : [];
-  const boxPlot = isNumeric ? generateBoxPlot(data, selectedColumn) : null;
-
-  // Convert box plot to chart data
-  const boxPlotData = boxPlot
-    ? [
-        {
-          name: 'Distribution',
-          min: boxPlot.min,
-          q1: boxPlot.q1,
-          median: boxPlot.median,
-          q3: boxPlot.q3,
-          max: boxPlot.max,
-        },
-      ]
-    : [];
 
   // Trend analysis
   const timeSeriesData = isDate ? generateTimeSeries(data, selectedColumn) : [];

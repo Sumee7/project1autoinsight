@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, TrendingUp, Grid3X3, Activity, Shield } from 'lucide-react';
+import { BarChart3, Grid3X3, Activity, Shield } from 'lucide-react';
 import { Statistics } from '../types';
 import AIAssistant from './AIAssistant';
 import AnalyticsDashboard from './AnalyticsDashboard';
@@ -18,7 +18,6 @@ interface VisualizationScreenProps {
 }
 
 export default function VisualizationScreen({
-  statistics,
   onNext,
   rows = [],
   dataSummary,

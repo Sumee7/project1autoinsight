@@ -11,7 +11,6 @@ interface DataPreviewProps {
 export default function DataPreview({
   data,
   onExport,
-  maxRows = 100,
 }: DataPreviewProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

@@ -28,6 +28,8 @@ export interface Statistics {
   stdDev?: number;
 }
 
+export type DataRow = Record<string, string | number | null | undefined>;
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
