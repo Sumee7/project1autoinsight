@@ -1,131 +1,44 @@
 import { useState } from "react";
-
 import LoginScreen from "./components/LoginScreen";
-import UploadScreen from "./components/UploadScreen";
 import CleaningScreen from "./components/CleaningScreen";
-import VisualizationScreen from "./components/VisualizationScreen";
-
-import { analyzeCsvFile } from "./utils/csvAnalysis";
-import type { CleaningIssues, DataSummary, Statistics } from "./types";
-
-type Step = "login" | "upload" | "cleaning" | "visualization";
-
-const emptyStats: Statistics = {
-  mean: 0,
-  median: 0,
-  min: 0,
-  max: 0,
-  stdDev: 0,
-};
+import type { CleaningIssues, DataSummary } from "./types";
 
 export default function App() {
-  const [step, setStep] = useState<Step>("login");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
-  const [cleaningIssues, setCleaningIssues] = useState<CleaningIssues | null>(null);
-
-  // VisualizationScreen bunu istiyor: Statistics
-  const [statistics, setStatistics] = useState<Statistics>(emptyStats);
-
-  const handleAnalyze = async () => {
-    if (!selectedFile) return;
-
-    try {
-      const result = await analyzeCsvFile(selectedFile);
-
-      setDataSummary(result.dataSummary);
-      setCleaningIssues(result.cleaningIssues);
-
-      // csvAnalysis statistics döndürmüyorsa bile crash olmasın diye default set
-      setStatistics((result as any).statistics ?? emptyStats);
-
-      setStep("cleaning");
-    } catch (err) {
-      console.error(err);
-      alert("CSV analysis failed. Please check the CSV format and try again.");
-    }
+  const dataSummary: DataSummary = {
+    rows: 1213,
+    columns: 8,
+    duplicates: 34,
+    columnDetails: [
+      { name: "ID", type: "number" },
+      { name: "Date", type: "date" },
+      { name: "Customer Name", type: "string" },
+      { name: "Product", type: "string" },
+      { name: "Category", type: "string" },
+      { name: "Score", type: "number" },
+      { name: "Revenue", type: "number" },
+      { name: "Status", type: "string" },
+    ],
   };
 
-  const handleClean = (type: "auto" | "missing" | "invalid") => {
-    // Şimdilik UI simülasyonu: İstersen gerçek temizleme de ekleriz.
-    console.log("Clean:", type);
-
-    if (!dataSummary || !cleaningIssues) return;
-
-    if (type === "auto") {
-      setCleaningIssues({
-        missingValues: [],
-        invalidTypes: [],
-        outliers: [],
-        duplicates: 0,
-      });
-
-      setDataSummary({
-        ...dataSummary,
-        rows: Math.max(0, dataSummary.rows - (dataSummary.duplicates ?? 0)),
-        duplicates: 0,
-      });
-    }
-
-    if (type === "missing") {
-      setCleaningIssues({
-        ...cleaningIssues,
-        missingValues: [],
-      });
-    }
-
-    if (type === "invalid") {
-      setCleaningIssues({
-        ...cleaningIssues,
-        invalidTypes: [],
-      });
-    }
+  const cleaningIssues: CleaningIssues = {
+    missingValues: [],
+    invalidTypes: [],
+    outliers: [],
+    duplicates: 34,
   };
 
-  // ---------------- RENDER ----------------
-
-  if (step === "login") {
-    // ✅ LoginScreen prop ismi onSuccess
-    return <LoginScreen onSuccess={() => setStep("upload")} />;
+  if (!isLoggedIn) {
+    return <LoginScreen onSuccess={() => setIsLoggedIn(true)} />;
   }
 
-  if (step === "upload") {
-    return (
-      <UploadScreen
-        selectedFile={selectedFile}
-        onFileSelect={(file) => setSelectedFile(file)}
-        onAnalyze={handleAnalyze}
-      />
-    );
-  }
-
-  if (step === "cleaning") {
-    if (!dataSummary || !cleaningIssues) {
-      // güvenlik
-      setStep("upload");
-      return null;
-    }
-
-    return (
-      <CleaningScreen
-        dataSummary={dataSummary}
-        cleaningIssues={cleaningIssues}
-        onClean={handleClean}
-        onNext={() => setStep("visualization")}
-      />
-    );
-  }
-
-  // visualization
   return (
-    <VisualizationScreen
-      statistics={statistics}
-      onNext={() => {
-        // Summary sayfan varsa buraya bağlarız
-        alert("Summary screen is not connected yet. If you want, I can link it now.");
-      }}
+    <CleaningScreen
+      dataSummary={dataSummary}
+      cleaningIssues={cleaningIssues}
+      onClean={() => {}}
+      onNext={() => {}}
     />
   );
 }
