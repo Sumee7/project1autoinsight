@@ -16,6 +16,8 @@ import {
   Activity,
   AlertTriangle,
   Download,
+  Zap,
+  BarChart3,
 } from 'lucide-react';
 import type { DataRow, DataSummary } from '../types';
 import {
@@ -26,6 +28,8 @@ import {
   generateTimeSeries,
 } from '../utils/dataVisualization';
 import { detectAnomaliesZScore, detectTrend } from '../utils/analytics';
+import { pearsonCorrelation, confidenceInterval, tTest, getSignificanceLabel } from '../utils/statistics';
+import { drillDownByValue, compareSegments } from '../utils/drillDown';
 
 interface AnalyticsDashboardProps {
   data: DataRow[];
@@ -40,6 +44,9 @@ export default function AnalyticsDashboard({
   const [selectedColumn, setSelectedColumn] = useState<string>(
     Object.keys(data[0] || {})[0] || ''
   );
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [drillDownValue, setDrillDownValue] = useState<string | number | null>(null);
+  const [drillDownData, setDrillDownData] = useState<DataRow[]>([]);
 
   if (data.length === 0) {
     return (
@@ -88,26 +95,93 @@ export default function AnalyticsDashboard({
 
       {/* Statistics Cards */}
       {isNumeric && stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Mean</div>
-            <div className="text-2xl font-bold text-blue-400">{stats.mean}</div>
-          </div>
-          <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Median</div>
-            <div className="text-2xl font-bold text-green-400">{stats.median}</div>
-          </div>
-          <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Std Dev</div>
-            <div className="text-2xl font-bold text-purple-400">{stats.stdev}</div>
-          </div>
-          <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-4">
-            <div className="text-sm text-gray-400">Range</div>
-            <div className="text-2xl font-bold text-orange-400">
-              {stats.max - stats.min}
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
+              <div className="text-sm text-gray-400">Mean</div>
+              <div className="text-2xl font-bold text-blue-400">{stats.mean}</div>
+            </div>
+            <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
+              <div className="text-sm text-gray-400">Median</div>
+              <div className="text-2xl font-bold text-green-400">{stats.median}</div>
+            </div>
+            <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4">
+              <div className="text-sm text-gray-400">Std Dev</div>
+              <div className="text-2xl font-bold text-purple-400">{stats.stdev}</div>
+            </div>
+            <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-4">
+              <div className="text-sm text-gray-400">Range</div>
+              <div className="text-2xl font-bold text-orange-400">
+                {stats.max - stats.min}
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Confidence Interval */}
+          {(() => {
+            const ci = confidenceInterval(
+              data
+                .map((row) => row[selectedColumn])
+                .filter((val) => typeof val === 'number') as number[],
+              0.95
+            );
+            return (
+              <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm font-semibold text-indigo-300">95% Confidence Interval</span>
+                </div>
+                <div className="text-sm text-gray-300">
+                  [{ci.lowerBound}, {ci.upperBound}] ± {ci.marginOfError}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Statistical Tests Toggle */}
+          <button
+            onClick={() => setShowStatistics(!showStatistics)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/30 text-indigo-300 rounded-lg transition-all text-sm font-semibold"
+          >
+            <BarChart3 className="w-4 h-4" />
+            {showStatistics ? 'Hide' : 'Show'} Statistical Tests
+          </button>
+
+          {/* Statistical Tests Results */}
+          {showStatistics && (
+            <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">📊 Statistical Analysis</h3>
+              
+              {(() => {
+                const numValues = data
+                  .map((row) => row[selectedColumn])
+                  .filter((val) => typeof val === 'number') as number[];
+                
+                if (numValues.length < 2) return <p className="text-xs text-gray-500">Insufficient data</p>;
+
+                // Split data in half for t-test
+                const mid = Math.floor(numValues.length / 2);
+                const group1 = numValues.slice(0, mid);
+                const group2 = numValues.slice(mid);
+                const testResult = tTest(group1, group2);
+
+                return (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-gray-700/20 rounded">
+                      <div className="text-xs font-semibold text-gray-300 mb-1">T-Test (Group Comparison)</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>t-statistic: <span className="text-gray-300">{testResult.tStatistic}</span></div>
+                        <div>p-value: <span className={testResult.pValue < 0.05 ? 'text-orange-400' : 'text-green-400'}>{testResult.pValue} {getSignificanceLabel(testResult.pValue)}</span></div>
+                        <div className="col-span-2">Effect Size: <span className="text-gray-300">{testResult.effectSize}</span></div>
+                        <div className="col-span-2 text-gray-400">{testResult.interpretation}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </>
       )}
 
       {/* Distribution Chart */}
