@@ -3,12 +3,15 @@ import { LineChart, BarChart3, ScatterChart, TrendingUp, Lightbulb } from 'lucid
 import { ChartType, Statistics } from '../types';
 import AIAssistant from './AIAssistant';
 
+type DataRow = Record<string, string | number | null | undefined>;
+
 interface VisualizationScreenProps {
   statistics: Statistics;
   onNext: () => void;
+  rows?: DataRow[];
 }
 
-export default function VisualizationScreen({ statistics, onNext }: VisualizationScreenProps) {
+export default function VisualizationScreen({ statistics, onNext, rows }: VisualizationScreenProps) {
   const [activeChart, setActiveChart] = useState<ChartType>('line');
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
@@ -27,16 +30,16 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex">
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Visualization</h1>
-            <p className="text-gray-600">Explore your data through interactive charts</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Data Visualization</h1>
+            <p className="text-gray-300">Explore your data through interactive charts</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-            <div className="border-b border-gray-200">
+          <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl shadow-lg mb-6">
+            <div className="border-b border-gray-700/50">
               <div className="flex gap-1 p-2">
                 {chartTabs.map(({ type, icon: Icon, label }) => (
                   <button
@@ -44,8 +47,8 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
                     onClick={() => setActiveChart(type)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
                       activeChart === type
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50'
+                        : 'text-gray-400 hover:bg-gray-700/50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -56,14 +59,14 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
             </div>
 
             <div className="p-8">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 h-96 flex items-center justify-center">
+              <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 rounded-lg border border-blue-600/30 h-96 flex items-center justify-center">
                 {activeChart === 'line' && (
                   <div className="relative w-full h-full p-6">
                     <svg className="w-full h-full" viewBox="0 0 800 300">
                       <defs>
                         <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#3A7AFE" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="#3A7AFE" stopOpacity="0" />
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
                         </linearGradient>
                       </defs>
                       <polyline
@@ -73,18 +76,18 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
                       />
                       <polyline
                         fill="none"
-                        stroke="#3A7AFE"
+                        stroke="#60a5fa"
                         strokeWidth="3"
                         points="0,250 100,200 200,180 300,160 400,140 500,100 600,80 700,60 800,40"
                       />
                       {[0, 100, 200, 300, 400, 500, 600, 700, 800].map((x, i) => {
                         const y = [250, 200, 180, 160, 140, 100, 80, 60, 40][i];
                         return (
-                          <circle key={i} cx={x} cy={y} r="5" fill="#3A7AFE" />
+                          <circle key={i} cx={x} cy={y} r="5" fill="#60a5fa" />
                         );
                       })}
                     </svg>
-                    <div className="absolute bottom-2 left-0 right-0 flex justify-between px-6 text-xs text-gray-600">
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-between px-6 text-xs text-gray-400">
                       <span>Jan</span>
                       <span>Feb</span>
                       <span>Mar</span>
@@ -110,7 +113,7 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
                             y={280 - height}
                             width="60"
                             height={height}
-                            fill="#3A7AFE"
+                            fill="#60a5fa"
                             rx="4"
                           />
                         );
@@ -131,7 +134,7 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
                           cx={point.x}
                           cy={point.y}
                           r={point.r}
-                          fill="#3A7AFE"
+                          fill="#60a5fa"
                           opacity="0.6"
                         />
                       ))}
@@ -143,10 +146,10 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-4">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Summary Statistics</h2>
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Summary Statistics</h2>
               </div>
               <div className="space-y-3">
                 {[
@@ -156,9 +159,9 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
                   { label: 'Max', value: statistics.max },
                   { label: 'Std Dev', value: statistics.stdDev },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">{label}</span>
-                    <span className="text-lg font-bold text-gray-900">
+                  <div key={label} className="flex justify-between items-center p-3 bg-gray-700/30 rounded-lg border border-gray-600/30">
+                    <span className="font-medium text-gray-300">{label}</span>
+                    <span className="text-lg font-bold text-white">
                       {value?.toFixed(2) ?? 'N/A'}
                     </span>
                   </div>
@@ -166,22 +169,22 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-gray-800/50 backdrop-blur border border-gray-700/50 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-4">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Category Frequency</h2>
+                <BarChart3 className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Category Frequency</h2>
               </div>
               <div className="space-y-2">
                 {categoryData.map((item) => (
                   <div key={item.category} className="flex items-center gap-3">
                     <div className="flex-1">
                       <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{item.category}</span>
-                        <span className="text-sm font-semibold text-gray-900">{item.count}</span>
+                        <span className="text-sm font-medium text-gray-300">{item.category}</span>
+                        <span className="text-sm font-semibold text-white">{item.count}</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-gray-700/30 rounded-full h-2 border border-gray-600/30">
                         <div
-                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          className="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full transition-all"
                           style={{ width: `${(item.count / 142) * 100}%` }}
                         ></div>
                       </div>
@@ -192,24 +195,24 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6 mb-6">
+          <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/30 p-6 mb-6">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <Lightbulb className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-blue-600/50 rounded-full flex items-center justify-center flex-shrink-0 border border-blue-500/50">
+                <Lightbulb className="w-5 h-5 text-blue-300" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Key Insights</h3>
-                <ul className="space-y-2 text-gray-700">
+                <h3 className="font-semibold text-white mb-2">Key Insights</h3>
+                <ul className="space-y-2 text-gray-300">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
+                    <span className="text-blue-400 mt-1">•</span>
                     <span>Column <strong>Score</strong> shows an increasing trend over time with a steady growth pattern.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
+                    <span className="text-blue-400 mt-1">•</span>
                     <span><strong>Electronics</strong> category has the highest frequency at 142 occurrences.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
+                    <span className="text-blue-400 mt-1">•</span>
                     <span>Data distribution shows minimal outliers, indicating consistent data quality.</span>
                   </li>
                 </ul>
@@ -220,7 +223,7 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
           <div className="flex justify-end">
             <button
               onClick={onNext}
-              className="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              className="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
             >
               View Summary
             </button>
@@ -232,6 +235,7 @@ export default function VisualizationScreen({ statistics, onNext }: Visualizatio
         isOpen={isAssistantOpen}
         onToggle={() => setIsAssistantOpen(!isAssistantOpen)}
         context="data visualization"
+        rows={rows}
       />
     </div>
   );
