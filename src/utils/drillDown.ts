@@ -36,6 +36,7 @@ export interface SegmentComparison {
     rowCountDiff: number;
     rowCountDiffPercent: number;
     meanDiff?: number;
+    meanDiffPercent?: number;
     medianDiff?: number;
     stdevDiff?: number;
   };
@@ -100,6 +101,13 @@ export function compareSegments(
 
   const isDifferentSignificant = Math.abs(rowCountDiffPercent) > 10;
 
+  const meanDiff = segment1Stats.mean && segment2Stats.mean
+    ? Math.round((segment1Stats.mean - segment2Stats.mean) * 100) / 100
+    : undefined;
+  const meanDiffPercent = segment1Stats.mean && segment2Stats.mean && segment2Stats.mean !== 0
+    ? Math.round(((segment1Stats.mean - segment2Stats.mean) / segment2Stats.mean) * 100 * 100) / 100
+    : undefined;
+
   return {
     segment1: {
       name: String(value1),
@@ -122,9 +130,8 @@ export function compareSegments(
     differences: {
       rowCountDiff,
       rowCountDiffPercent: Math.round(rowCountDiffPercent * 100) / 100,
-      meanDiff: segment1Stats.mean && segment2Stats.mean
-        ? Math.round((segment1Stats.mean - segment2Stats.mean) * 100) / 100
-        : undefined,
+      meanDiff,
+      meanDiffPercent,
       medianDiff: segment1Stats.median && segment2Stats.median
         ? Math.round((segment1Stats.median - segment2Stats.median) * 100) / 100
         : undefined,

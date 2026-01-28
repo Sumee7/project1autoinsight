@@ -136,16 +136,18 @@ export default function SegmentComparisonUI({ comparison }: SegmentComparisonUIP
                   {comparison.differences.meanDiff > 0 ? '+' : ''}
                   {comparison.differences.meanDiff}
                 </div>
-                <div
-                  className={`text-xs font-semibold ${
-                    comparison.differences.meanDiffPercent > 0
-                      ? 'text-green-400'
-                      : 'text-red-400'
-                  }`}
-                >
-                  {comparison.differences.meanDiffPercent > 0 ? '+' : ''}
-                  {comparison.differences.meanDiffPercent}%
-                </div>
+                {comparison.differences.meanDiffPercent !== undefined && (
+                  <div
+                    className={`text-xs font-semibold ${
+                      comparison.differences.meanDiffPercent > 0
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }`}
+                  >
+                    {comparison.differences.meanDiffPercent > 0 ? '+' : ''}
+                    {comparison.differences.meanDiffPercent}%
+                  </div>
+                )}
               </div>
             </div>
           )}

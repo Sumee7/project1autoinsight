@@ -28,8 +28,7 @@ import {
   generateTimeSeries,
 } from '../utils/dataVisualization';
 import { detectAnomaliesZScore, detectTrend } from '../utils/analytics';
-import { pearsonCorrelation, confidenceInterval, tTest, getSignificanceLabel } from '../utils/statistics';
-import { drillDownByValue, compareSegments } from '../utils/drillDown';
+import { confidenceInterval, tTest, getSignificanceLabel } from '../utils/statistics';
 
 interface AnalyticsDashboardProps {
   data: DataRow[];
@@ -45,8 +44,6 @@ export default function AnalyticsDashboard({
     Object.keys(data[0] || {})[0] || ''
   );
   const [showStatistics, setShowStatistics] = useState(false);
-  const [drillDownValue, setDrillDownValue] = useState<string | number | null>(null);
-  const [drillDownData, setDrillDownData] = useState<DataRow[]>([]);
 
   if (data.length === 0) {
     return (

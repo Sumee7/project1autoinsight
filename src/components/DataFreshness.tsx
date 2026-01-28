@@ -1,5 +1,5 @@
 import { Clock, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
-import { lineageTracker, type DataLineageHistory } from '../utils/dataLineage';
+import type { DataLineageHistory } from '../utils/dataLineage';
 
 interface DataFreshnessProps {
   history: DataLineageHistory;
@@ -8,9 +8,6 @@ interface DataFreshnessProps {
 
 export default function DataFreshness({ history, onViewTimeline }: DataFreshnessProps) {
   const freshness = getFreshnessInfo(history);
-  const impact = history.events.filter(
-    (e) => e.action !== 'uploaded'
-  ).length;
 
   return (
     <div className="space-y-4">

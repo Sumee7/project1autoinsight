@@ -19,12 +19,15 @@ interface VisualizationScreenProps {
 
 export default function VisualizationScreen({
   onNext,
-  rows = [],
+  rows,
   dataSummary,
   cleaningIssues,
 }: VisualizationScreenProps) {
   const [activeTab, setActiveTab] = useState<'analytics' | 'quality' | 'preview'>('analytics');
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  
+  // Ensure rows has a default
+  const dataRows = rows && rows.length > 0 ? rows : [];
 
   const tabs = [
     { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
@@ -33,7 +36,7 @@ export default function VisualizationScreen({
   ];
 
   const handleExport = (format: 'csv' | 'json' | 'html' | 'report') => {
-    if (rows.length === 0) {
+    if (dataRows.length === 0) {
       alert('No data to export');
       return;
     }
@@ -43,21 +46,21 @@ export default function VisualizationScreen({
 
     switch (format) {
       case 'csv':
-        exportToCSV(rows, `${filename}.csv`);
+        exportToCSV(dataRows, `${filename}.csv`);
         break;
       case 'json':
-        exportToJSON(rows, `${filename}.json`);
+        exportToJSON(dataRows, `${filename}.json`);
         break;
       case 'html':
-        exportToHTML(rows, `${filename}.html`);
+        exportToHTML(dataRows, `${filename}.html`);
         break;
       case 'report':
         const insights = [
           'Successfully analyzed dataset',
-          `Total records: ${rows.length}`,
+          `Total records: ${dataRows.length}`,
           `Analysis completed on ${new Date().toLocaleDateString()}`,
         ];
-        generateAnalysisReport(rows, rows, insights, `analysis-report-${timestamp}.html`);
+        generateAnalysisReport(dataRows, dataRows, insights, `analysis-report-${timestamp}.html`);
         break;
     }
   };
@@ -122,30 +125,46 @@ export default function VisualizationScreen({
 
           {/* Content */}
           <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-6">
-            {activeTab === 'analytics' && rows.length > 0 ? (
-              <AnalyticsDashboard data={rows} dataSummary={dataSummary} onExport={() => handleExport('report')} />
-            ) : activeTab === 'quality' && rows.length > 0 ? (
-              <DataQualityDashboard data={rows} dataSummary={dataSummary} />
-            ) : activeTab === 'preview' && rows.length > 0 ? (
-              <DataPreview data={rows} onExport={() => handleExport('csv')} />
-            ) : (
-              <div className="text-center py-12 text-gray-400">
-                <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Upload data to view {activeTab}</p>
-              </div>
-            )}
+            {activeTab === 'analytics' ? (
+              dataRows && dataRows.length > 0 ? (
+                <AnalyticsDashboard data={dataRows} dataSummary={dataSummary} onExport={() => handleExport('report')} />
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No data loaded. Please go back to upload data.</p>
+                </div>
+              )
+            ) : activeTab === 'quality' ? (
+              dataRows && dataRows.length > 0 ? (
+                <DataQualityDashboard data={dataRows} dataSummary={dataSummary} />
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No data loaded. Please go back to upload data.</p>
+                </div>
+              )
+            ) : activeTab === 'preview' ? (
+              dataRows && dataRows.length > 0 ? (
+                <DataPreview data={dataRows} onExport={() => handleExport('csv')} />
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No data loaded. Please go back to upload data.</p>
+                </div>
+              )
+            ) : null}
           </div>
 
           {/* Summary Statistics */}
-          {rows.length > 0 && (
+          {dataRows && dataRows.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Total Records</div>
-                <div className="text-2xl font-bold text-blue-400">{rows.length}</div>
+                <div className="text-2xl font-bold text-blue-400">{dataRows.length}</div>
               </div>
               <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Columns</div>
-                <div className="text-2xl font-bold text-green-400">{Object.keys(rows[0] || {}).length}</div>
+                <div className="text-2xl font-bold text-green-400">{Object.keys(dataRows[0] || {}).length}</div>
               </div>
               <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Data Quality</div>
@@ -176,7 +195,7 @@ export default function VisualizationScreen({
         context="data visualization & analysis"
         dataSummary={dataSummary}
         cleaningIssues={cleaningIssues}
-        rows={rows}
+        rows={dataRows}
       />
     </div>
   );

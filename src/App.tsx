@@ -181,12 +181,39 @@ export default function App() {
         />
       )}
 
-      {currentScreen === "visualization" && dataSummary && (
-        <VisualizationScreen
-          statistics={calculateStatistics()}
-          onNext={() => setCurrentScreen("summary")}
-          rows={cleanedRows}
-        />
+      {currentScreen === "visualization" && (
+        <>
+          {dataSummary && cleanedRows.length > 0 && (
+            <VisualizationScreen
+              statistics={calculateStatistics()}
+              onNext={() => setCurrentScreen("summary")}
+              rows={cleanedRows}
+              dataSummary={dataSummary}
+              cleaningIssues={cleaningIssues}
+            />
+          )}
+
+          {(!dataSummary || cleanedRows.length === 0) && (
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-white mb-4">No Data Available</h1>
+                <p className="text-gray-400 mb-4">
+                  {!dataSummary ? "Data summary is missing. " : ""}
+                  {cleanedRows.length === 0 ? "No rows found. " : ""}
+                  Please go back and try again.
+                </p>
+                <button
+                  onClick={() => {
+                    setCurrentScreen("cleaning");
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition"
+                >
+                  ← Go Back to Cleaning
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {currentScreen === "summary" && (

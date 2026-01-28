@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Send, ChevronRight, Loader2, Sparkles, Copy, Download, AlertCircle, CheckCircle, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
+import { Bot, Send, ChevronRight, Loader2, Sparkles, Copy, Download, AlertCircle, CheckCircle, TrendingUp, TrendingDown, BarChart3, Trash2, Edit2, Search, Star, ThumbsUp, ThumbsDown, Volume2, Mic, Save } from 'lucide-react';
 import { ChatMessage, DataSummary, CleaningIssues } from '../types';
 import { answerSalesQuestion } from '../utils/salesAI';
 import { 
@@ -23,6 +23,12 @@ interface AIAssistantProps {
   rows?: DataRow[];
 }
 
+interface MessageFeedback {
+  messageId: string;
+  rating: 'like' | 'dislike' | 'star';
+  comment?: string;
+}
+
 export default function AIAssistant({
   isOpen,
   onToggle,
@@ -43,13 +49,166 @@ export default function AIAssistant({
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; text: string; label: string }[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [messageFeedback, setMessageFeedback] = useState<MessageFeedback[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Helper function to render formatted messages with visual elements
+  // Export chat history
+  const exportChatHistory = (format: 'json' | 'csv' | 'txt') => {
+    let content: string;
+    const timestamp = new Date().toLocaleString();
+    const filename = `chat_history_${Date.now()}`;
+
+    if (format === 'json') {
+      content = JSON.stringify(messages, null, 2);
+    } else if (format === 'csv') {
+      const headers = ['Timestamp', 'Role', 'Message'];
+      const rows = messages.map((msg) => [
+        msg.timestamp.toLocaleString(),
+        msg.role,
+        `"${msg.content.replace(/"/g, '""')}"`,
+      ]);
+      content = [headers, ...rows].map((row) => row.join(',')).join('\n');
+    } else {
+      content = messages
+        .map(
+          (msg) =>
+            `[${msg.timestamp.toLocaleString()}] ${msg.role.toUpperCase()}:\n${msg.content}\n`
+        )
+        .join('\n---\n\n');
+    }
+
+    const element = document.createElement('a');
+    element.setAttribute('href', `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`);
+    element.setAttribute('download', `${filename}.${format}`);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  // Message search
+  const filteredMessages = messages.filter(
+    (msg) =>
+      msg.content.toLowerCase().includes(searchQuery.toLowerCase()) || searchQuery === ''
+  );
+
+  // Save message as template
+  const saveAsTemplate = (messageId: string) => {
+    const message = messages.find((m) => m.id === messageId);
+    if (message && message.role === 'user') {
+      const label = prompt('Template name:', message.content.slice(0, 30));
+      if (label) {
+        setSavedTemplates([
+          ...savedTemplates,
+          {
+            id: Date.now().toString(),
+            text: message.content,
+            label,
+          },
+        ]);
+      }
+    }
+  };
+
+  // Delete message
+  const deleteMessage = (messageId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+  };
+
+  // Edit message
+  const editMessage = (messageId: string, newContent: string) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, content: newContent } : msg))
+    );
+    setEditingId(null);
+  };
+
+  // Add feedback
+  const addFeedback = (messageId: string, rating: 'like' | 'dislike' | 'star') => {
+    setMessageFeedback((prev) => {
+      const existing = prev.find((f) => f.messageId === messageId);
+      if (existing) {
+        return prev.map((f) => (f.messageId === messageId ? { ...f, rating } : f));
+      }
+      return [...prev, { messageId, rating }];
+    });
+  };
+
+  // Text-to-speech
+  const speakMessage = (text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    speechSynthesis.speak(utterance);
+  };
+
+  // Speech-to-text
+  const startVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported in your browser');
+      return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.start();
+    
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('');
+      setInput(transcript);
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+    };
+  };
+
+  // Context awareness - improve follow-up understanding
+  const getConversationContext = () => {
+    if (messages.length === 0) return '';
+    
+    const recentMessages = messages.slice(-4);
+    const userMessages = recentMessages
+      .filter(m => m.role === 'user')
+      .map(m => m.content.toLowerCase())
+      .join(' ');
+    
+    if (userMessages.includes('missing') || userMessages.includes('null')) return 'missing_values';
+    if (userMessages.includes('duplicate')) return 'duplicates';
+    if (userMessages.includes('invalid') || userMessages.includes('type')) return 'invalid_types';
+    if (userMessages.includes('anomal') || userMessages.includes('outlier')) return 'anomalies';
+    return '';
+  };
+
+  // Local storage for conversation memory
+  useEffect(() => {
+    const saved = localStorage.getItem('chat_messages');
+    if (saved && messages.length === 1) {
+      try {
+        const parsed = JSON.parse(saved);
+        setMessages(parsed);
+      } catch (e) {
+        console.log('Could not load saved messages');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 1) {
+      localStorage.setItem('chat_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
   const renderFormattedMessage = (content: string) => {
     const lines = content.split('\n');
     const elements: JSX.Element[] = [];
@@ -598,6 +757,7 @@ ${totalIssues === 0 ? '✅ No issues found! Data is ready to analyze.' : '1. Cle
 Just ask!`;
   };
 
+  // Improved handleSend with better response handling
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -613,8 +773,10 @@ Just ask!`;
     setIsTyping(true);
 
     const currentInput = trimmed;
+    const context = getConversationContext();
     setInput('');
 
+    // Simulate processing delay with streaming effect
     setTimeout(() => {
       const q_lower = currentInput.toLowerCase();
       const headers = rows && rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
@@ -759,106 +921,259 @@ Upload a file and ask me anything!`;
           isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border border-white/30">
-              <Sparkles className="w-5 h-5" />
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center border border-white/30">
+              <Sparkles className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-semibold">AI Data Analyst</h3>
+            <div className="flex-1">
+              <h3 className="font-semibold text-sm">AI Data Analyst</h3>
               <p className="text-xs text-blue-100">
-                {context ? `Context: ${context}` : 'Intelligent analysis engine'}
+                {context ? `Context: ${context}` : 'Smart analysis engine'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onToggle}
-            className="lg:hidden text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Export button */}
+            <div className="relative group">
+              <button
+                className="text-white hover:bg-white/20 p-1.5 rounded transition-colors"
+                title="Export chat"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              <div className="absolute right-0 mt-1 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto z-50 flex flex-col">
+                <button
+                  onClick={() => exportChatHistory('json')}
+                  className="px-2 py-1 hover:bg-blue-600 whitespace-nowrap"
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={() => exportChatHistory('csv')}
+                  className="px-2 py-1 hover:bg-blue-600 whitespace-nowrap"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportChatHistory('txt')}
+                  className="px-2 py-1 hover:bg-blue-600 whitespace-nowrap"
+                >
+                  TXT
+                </button>
+              </div>
+            </div>
+            {/* Search button */}
+            <button
+              onClick={() => setSearchQuery(searchQuery ? '' : ' ')}
+              className="text-white hover:bg-white/20 p-1.5 rounded transition-colors"
+              title="Search messages"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            {/* Clear history button */}
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all chat history?')) {
+                  setMessages([{
+                    id: '1',
+                    role: 'assistant',
+                    content: "Hi! I'm your AI Data Analyst. I can help you understand your data, analyze quality issues, and provide insights. Upload a dataset to get started, or ask me anything!",
+                    timestamp: new Date(),
+                  }]);
+                  localStorage.removeItem('chat_messages');
+                }
+              }}
+              className="text-white hover:bg-white/20 p-1.5 rounded transition-colors"
+              title="Clear history"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            {/* Close button */}
+            <button
+              onClick={onToggle}
+              className="lg:hidden text-white hover:bg-white/20 p-1.5 rounded transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/30">
+        {/* Search bar */}
+        {searchQuery !== '' && (
+          <div className="px-3 py-2 bg-gray-800/30 border-b border-gray-700/50">
+            <input
+              type="text"
+              placeholder="Search messages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-1.5 bg-gray-700/50 border border-gray-600/50 text-white placeholder-gray-400 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-900/30">
           {/* Data Context Summary - Show at start if data available */}
-          {hasRows && messages.length <= 1 && dataSummary && (
-            <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 rounded-xl p-3 border border-blue-500/30">
-              <p className="text-xs font-semibold text-blue-300 mb-2">📊 Your Dataset</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+          {rows && rows.length > 0 && messages.length <= 1 && dataSummary && (
+            <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 rounded-lg p-2.5 border border-blue-500/30 text-xs">
+              <p className="text-blue-300 font-semibold mb-1.5">📊 Dataset Info</p>
+              <div className="grid grid-cols-2 gap-1.5">
                 <div><span className="text-gray-400">Rows:</span> <span className="text-white font-bold">{dataSummary.rows.toLocaleString()}</span></div>
-                <div><span className="text-gray-400">Columns:</span> <span className="text-white font-bold">{dataSummary.columns}</span></div>
-                <div><span className="text-gray-400">Completeness:</span> <span className="text-green-400 font-bold">{getDataContextSummary()?.completeness}%</span></div>
+                <div><span className="text-gray-400">Cols:</span> <span className="text-white font-bold">{dataSummary.columns}</span></div>
+                <div><span className="text-gray-400">Complete:</span> <span className="text-green-400 font-bold">{getDataContextSummary()?.completeness}%</span></div>
                 <div><span className="text-gray-400">Issues:</span> <span className="text-orange-400 font-bold">{getDataContextSummary()?.issues}</span></div>
               </div>
             </div>
           )}
 
-          {messages.map((message) => (
+          {filteredMessages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+              className={`flex gap-2.5 group ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 border text-xs ${
                   message.role === 'user' 
                     ? 'bg-blue-600 border-blue-500 text-white' 
                     : 'bg-blue-600/30 border-blue-500/50 text-blue-300'
                 }`}
               >
-                {message.role === 'user' ? (
-                  <span className="text-white text-sm font-medium">U</span>
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
+                {message.role === 'user' ? 'U' : <Sparkles className="w-3 h-3" />}
               </div>
 
-              <div
-                className={`flex-1 rounded-2xl p-4 ${
-                  message.role === 'user' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-800/50 text-gray-100 border border-gray-700/50'
-                }`}
-              >
-                <div className="text-sm leading-relaxed">
-                  {message.role === 'user' ? (
-                    <p>{message.content}</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {renderFormattedMessage(message.content)}
+              <div className="flex-1">
+                {editingId === message.id ? (
+                  <div className="rounded-lg p-2.5 bg-gray-700/50 border border-gray-600/50 space-y-2">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-gray-700 border border-gray-600 text-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                      rows={3}
+                    />
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => editMessage(message.id, editText)}
+                        className="text-xs bg-green-600/30 hover:bg-green-600/50 text-green-300 border border-green-500/30 px-2 py-1 rounded transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="text-xs bg-gray-600/30 hover:bg-gray-600/50 text-gray-300 border border-gray-500/30 px-2 py-1 rounded transition-colors"
+                      >
+                        Cancel
+                      </button>
                     </div>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-700/50">
-                  <p className={`text-xs ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  {message.role === 'assistant' && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(message.content);
-                        alert('Copied to clipboard!');
-                      }}
-                      className="text-gray-500 hover:text-blue-400 p-1 rounded transition-colors"
-                      title="Copy response"
-                    >
-                      <Copy className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`rounded-lg p-3 text-xs leading-relaxed ${
+                      message.role === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-800/50 text-gray-100 border border-gray-700/50'
+                    }`}
+                  >
+                    <div>
+                      {message.role === 'user' ? (
+                        <p>{message.content}</p>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {renderFormattedMessage(message.content)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className={`text-xs ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {message.role === 'assistant' && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => speakMessage(message.content)}
+                            className="text-gray-500 hover:text-green-400 p-0.5 rounded transition-colors"
+                            title="Speak response"
+                          >
+                            <Volume2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(message.content);
+                              alert('Copied!');
+                            }}
+                            className="text-gray-500 hover:text-blue-400 p-0.5 rounded transition-colors"
+                            title="Copy"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => addFeedback(message.id, 'like')}
+                            className={`p-0.5 rounded transition-colors ${messageFeedback.find(f => f.messageId === message.id && f.rating === 'like') ? 'text-green-400' : 'text-gray-500 hover:text-green-400'}`}
+                            title="Helpful"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => addFeedback(message.id, 'dislike')}
+                            className={`p-0.5 rounded transition-colors ${messageFeedback.find(f => f.messageId === message.id && f.rating === 'dislike') ? 'text-red-400' : 'text-gray-500 hover:text-red-400'}`}
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => addFeedback(message.id, 'star')}
+                            className={`p-0.5 rounded transition-colors ${messageFeedback.find(f => f.messageId === message.id && f.rating === 'star') ? 'text-yellow-400' : 'text-gray-500 hover:text-yellow-400'}`}
+                            title="Save response"
+                          >
+                            <Star className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      {message.role === 'user' && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingId(message.id);
+                              setEditText(message.content);
+                            }}
+                            className="text-gray-500 hover:text-blue-400 p-0.5 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => saveAsTemplate(message.id)}
+                            className="text-gray-500 hover:text-yellow-400 p-0.5 rounded transition-colors"
+                            title="Save as template"
+                          >
+                            <Save className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => deleteMessage(message.id)}
+                            className="text-gray-500 hover:text-red-400 p-0.5 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
 
           {isTyping && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-600/30 border border-blue-500/50 text-blue-300">
-                <Sparkles className="w-4 h-4 animate-pulse" />
+            <div className="flex gap-2.5">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-600/30 border border-blue-500/50 text-blue-300">
+                <Sparkles className="w-3 h-3 animate-pulse" />
               </div>
-              <div className="flex-1 rounded-2xl p-3 bg-gray-800/50 border border-gray-700/50 text-gray-100">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                  <p className="text-sm text-gray-400">Analyzing your data...</p>
+              <div className="flex-1 rounded-lg p-2.5 bg-gray-800/50 border border-gray-700/50 text-gray-100 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                  <p className="text-gray-400">Analyzing...</p>
                 </div>
               </div>
             </div>
@@ -867,36 +1182,62 @@ Upload a file and ask me anything!`;
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-gray-700/50 bg-gray-900/20 space-y-3">
-          {/* Quick Stats if data available */}
-          {hasRows && dataSummary && (
-            <div className="bg-gray-800/30 rounded-lg p-2 border border-gray-700/50">
-              <p className="text-xs text-gray-400 mb-1.5 font-semibold">🎯 Quick Stats</p>
-              <div className="grid grid-cols-3 gap-1.5 text-xs">
-                <div className="bg-green-500/20 rounded px-2 py-1 border border-green-500/30 text-center">
-                  <div className="font-bold text-green-400">{dataSummary.rows}</div>
-                  <div className="text-gray-400 text-xs">Rows</div>
+        {/* Bottom Section */}
+        <div className="p-3 border-t border-gray-700/50 bg-gray-900/20 space-y-2.5">
+          {/* Saved Templates */}
+          {savedTemplates.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="text-xs text-gray-400 hover:text-gray-300 mb-1.5 flex items-center gap-1"
+              >
+                <Save className="w-3 h-3" /> Saved Templates ({savedTemplates.length})
+              </button>
+              {showTemplates && (
+                <div className="grid grid-cols-2 gap-1">
+                  {savedTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => setInput(template.text)}
+                      className="text-xs bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-300 border border-yellow-500/30 px-2 py-1 rounded transition-colors text-left truncate"
+                      title={template.text}
+                    >
+                      {template.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="bg-blue-500/20 rounded px-2 py-1 border border-blue-500/30 text-center">
-                  <div className="font-bold text-blue-400">{dataSummary.columns}</div>
-                  <div className="text-gray-400 text-xs">Columns</div>
-                </div>
-                <div className={`${getDataContextSummary()!.issues === 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-orange-500/20 border-orange-500/30'} rounded px-2 py-1 text-center`}>
-                  <div className={`font-bold ${getDataContextSummary()!.issues === 0 ? 'text-green-400' : 'text-orange-400'}`}>{getDataContextSummary()!.issues}</div>
-                  <div className="text-gray-400 text-xs">Issues</div>
-                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quick Stats */}
+          {rows && rows.length > 0 && dataSummary && (
+            <div className="bg-gray-800/30 rounded-lg p-2 border border-gray-700/50 grid grid-cols-3 gap-1 text-xs">
+              <div className="bg-green-500/10 rounded px-1.5 py-1 border border-green-500/20 text-center">
+                <div className="font-bold text-green-400">{dataSummary.rows}</div>
+                <div className="text-gray-500 text-xs">Rows</div>
+              </div>
+              <div className="bg-blue-500/10 rounded px-1.5 py-1 border border-blue-500/20 text-center">
+                <div className="font-bold text-blue-400">{dataSummary.columns}</div>
+                <div className="text-gray-500 text-xs">Cols</div>
+              </div>
+              <div className={`${getDataContextSummary()!.issues === 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-orange-500/10 border-orange-500/20'} rounded px-1.5 py-1 text-center`}>
+                <div className={`font-bold ${getDataContextSummary()!.issues === 0 ? 'text-green-400' : 'text-orange-400'}`}>{getDataContextSummary()!.issues}</div>
+                <div className="text-gray-500 text-xs">Issues</div>
               </div>
             </div>
           )}
 
+          {/* Example Prompts */}
           <div>
-            <p className="text-xs text-gray-400 mb-2 font-semibold">💡 Try asking:</p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <p className="text-xs text-gray-400 mb-1.5 font-semibold">💡 Quick prompts:</p>
+            <div className="grid grid-cols-2 gap-1">
               {examplePrompts.slice(0, 6).map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => setInput(prompt)}
-                  className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 px-2.5 py-1.5 rounded-lg transition-colors text-left hover:border-blue-500/60"
+                  className="text-xs bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 px-2.5 py-1.5 rounded-lg transition-colors text-left hover:border-blue-500/60 truncate"
+                  title={prompt}
                 >
                   {prompt}
                 </button>
@@ -904,21 +1245,32 @@ Upload a file and ask me anything!`;
             </div>
           </div>
 
-          <div className="flex gap-2">
+          {/* Input Area */}
+          <div className="flex gap-1.5">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Ask about your data..."
-              className="flex-1 px-4 py-2.5 bg-gray-700/50 border border-gray-600/50 text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="flex-1 px-3 py-2 bg-gray-700/50 border border-gray-600/50 text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-1.5 focus:ring-blue-500 text-xs"
             />
+            {/* Voice Input */}
+            <button
+              onClick={startVoiceInput}
+              className="bg-green-600/30 hover:bg-green-600/50 text-green-300 border border-green-500/30 p-2 rounded-lg transition-colors"
+              title="Voice input"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+            {/* Send Button */}
             <button
               onClick={handleSend}
               disabled={!input.trim()}
-              className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed"
+              className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed"
+              title="Send message"
             >
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4" />
             </button>
           </div>
         </div>

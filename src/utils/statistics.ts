@@ -202,7 +202,7 @@ export function confidenceInterval(
   );
 
   // t-value for 95% confidence with n-1 df (simplified: use ~1.96 for large n)
-  const tValue = data.length > 30 ? 1.96 : tValueFromDF(data.length - 1, confidence);
+  const tValue = data.length > 30 ? 1.96 : tValueFromDF(data.length - 1);
   const marginOfError = tValue * (std / Math.sqrt(data.length));
 
   return {
@@ -233,7 +233,7 @@ export function powerAnalysis(
   // Two-proportion z-test sample size formula
   // n = 2 * ((Za + Zb)^2 * (p1*(1-p1) + p2*(1-p2))) / (p1 - p2)^2
 
-  const zAlpha = zValue(1 - alpha / 2);
+  const zAlpha = zValue(1 - (alpha / 2));
   const zBeta = zValue(power);
 
   const p1 = baselineRate;
@@ -391,9 +391,8 @@ function zValue(p: number): number {
  * T-value for given confidence level and degrees of freedom
  * Returns approximate critical t-value
  */
-function tValueFromDF(df: number, confidence: number): number {
+function tValueFromDF(df: number): number {
   // Simplified t-value lookup
-  const alpha = 1 - confidence;
   const lookup: Record<string, number> = {
     '1': 12.706,
     '2': 4.303,
@@ -405,7 +404,7 @@ function tValueFromDF(df: number, confidence: number): number {
     '30': 2.042,
   };
 
-  if (lookup[df.toString()]) return lookup[df.toString()];
+    return lookup[df.toString()];
   if (df >= 30) return 1.96; // Normal approximation
   return lookup['30'] || 2.042;
 }
