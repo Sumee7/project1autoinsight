@@ -22,19 +22,21 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const navigateTo = (next: Screen) => {
+  if (next === currentScreen) return;
+
   setHistory((prev) => [...prev, currentScreen]);
   setCurrentScreen(next);
 };
+
 
 const goBack = () => {
   setHistory((prev) => {
     if (prev.length === 0) return prev;
 
-    const newHistory = [...prev];
-    const previousScreen = newHistory.pop()!;
-    setCurrentScreen(previousScreen);
-
-    return newHistory;
+    const copy = [...prev];
+    const previous = copy.pop()!;
+    setCurrentScreen(previous);
+    return copy;
   });
 };
 
