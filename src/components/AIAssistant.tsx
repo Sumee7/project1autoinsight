@@ -1086,7 +1086,11 @@ Upload a file and ask me anything!`;
                     
                     <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
                       <p className={`text-xs ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+{(() => {
+  const ts = message.timestamp;
+  const d = ts instanceof Date ? ts : new Date(ts);
+  return isNaN(d.getTime()) ? "" : d.toLocaleTimeString();
+})()}
                       </p>
                       {message.role === 'assistant' && (
                         <div className="flex gap-1">

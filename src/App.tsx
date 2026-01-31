@@ -1,4 +1,4 @@
-Npm import { useState } from "react";
+import { useState } from "react";
 import LoginScreen from "./components/LoginScreen";
 import UploadScreen from "./components/UploadScreen";
 import CleaningScreen from "./components/CleaningScreen";
@@ -13,6 +13,7 @@ type DataRow = Record<string, string | number | null | undefined>;
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>("upload");
+  const [history, setHistory] = useState<Screen[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
   const [cleaningIssues, setCleaningIssues] = useState<CleaningIssues | null>(null);
@@ -20,6 +21,23 @@ export default function App() {
   const [cleanedRows, setCleanedRows] = useState<DataRow[]>([]);
   const [error, setError] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const navigateTo = (next: Screen) => {
+  setHistory((prev) => [...prev, currentScreen]);
+  setCurrentScreen(next);
+};
+
+const goBack = () => {
+  setHistory((prev) => {
+    if (prev.length === 0) return prev;
+
+    const newHistory = [...prev];
+    const previousScreen = newHistory.pop()!;
+    setCurrentScreen(previousScreen);
+
+    return newHistory;
+  });
+};
+
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -41,7 +59,7 @@ export default function App() {
       setCleaningIssues(cleaningIssues);
       setRows(parsedRows as DataRow[]);
       setCleanedRows(parsedRows as DataRow[]);
-      setCurrentScreen("cleaning");
+      navigateTo("cleaning");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze file. Please try another file.");
       console.error(err);
@@ -160,6 +178,14 @@ export default function App() {
           <p className="text-sm mt-1">{error}</p>
         </div>
       )}
+{history.length > 0 && currentScreen !== "upload" && (
+  <button
+    onClick={goBack}
+    className="mb-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+  >
+    ← Back
+  </button>
+)}
 
       {currentScreen === "upload" && (
         <UploadScreen
