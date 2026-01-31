@@ -314,6 +314,7 @@ function cleanData(rows: DataRow[], type: "auto" | "missing" | "invalid", summar
 
   return cleaned;
 }
+// Minor UI/navigation improvement 
 
 function calculateCleaningIssues(rows: DataRow[], columnDetails: DataSummary["columnDetails"]): CleaningIssues {
   const missingValues = columnDetails.filter(col => {
